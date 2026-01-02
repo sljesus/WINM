@@ -1,0 +1,72 @@
+# Reglas del Proyecto WINM
+
+## Terminal y Entorno
+- SIEMPRE usar PowerShell para comandos de terminal en Windows
+- Los comandos deben ser compatibles con PowerShell (no bash)
+- Usar `Write-Host` en lugar de `echo` para output con colores
+- Usar rutas con backslash `\` o rutas relativas
+- Variables de entorno: usar `$env:VARIABLE` en PowerShell
+
+## Creación de Archivos
+- NO crear archivos Markdown (.md) automáticamente en modo agent
+- Solo crear archivos MD cuando el usuario lo solicite explícitamente
+- NO crear archivos de documentación temporal o de estado
+- Si necesitas documentar algo, actualiza archivos existentes en `docs/`
+- NO crear archivos como "SIGUIENTE_PASO.md", "ESTADO_*.md", "RESUMEN_*.md", etc.
+
+## Principios del Proyecto
+- Seguir KISS (Keep It Simple, Stupid) - máxima simplicidad
+- Aplicar SOLID de forma pragmática
+- Cloud-First: todo en Supabase, sin servidores locales
+- Privacidad Total: datos en servicios del usuario
+
+## Backend (Supabase/PostgreSQL)
+- Usar PL/pgSQL para funciones y triggers
+- Todas las tablas deben tener RLS habilitado
+- Migraciones deben ser idempotentes (usar IF NOT EXISTS)
+- Nunca hardcodear credenciales en código SQL
+- Usar snake_case para nombres de tablas y columnas
+- Comentarios en español en código SQL
+
+## Python
+- Python 3.9+ compatible
+- Seguir PEP 8 básico
+- Usar docstrings en funciones públicas
+- Manejar encoding UTF-8 explícitamente en Windows
+- Usar `python-dotenv` para variables de entorno
+- Scripts deben ser ejecutables directamente
+- Usar `sys.path` para imports relativos cuando sea necesario
+
+## Frontend (JavaScript Vanilla)
+- NO usar frameworks pesados
+- JavaScript ES6+ vanilla solamente
+- Usar async/await en lugar de promesas
+- Prevenir XSS con escapeHtml
+- Usar Chart.js vía CDN para gráficos
+- Responsive mobile-first
+- Usar camelCase para variables y funciones
+
+## Estructura de Archivos
+- Mantener estructura de carpetas existente
+- No crear archivos temporales o de estado
+- Documentación solo en `docs/`
+- Scripts solo en `scripts/`
+- Migraciones solo en `supabase/migrations/`
+
+## Comandos Comunes
+- Migraciones: `supabase db push`
+- Validación: `python scripts/validate_environment.py`
+- Pruebas: `python scripts/test_frontend_integration.py`
+- Ver migraciones: `supabase migration list`
+
+## Seguridad
+- Service Role Key solo en `.env` (scripts Python)
+- Anon Key en `web-app/js/config.js` (frontend)
+- NUNCA hardcodear credenciales en código SQL
+- Usar Webhook Secret para Edge Functions
+
+## Convenciones de Código
+- Python: snake_case para funciones y variables
+- SQL: snake_case para tablas y columnas
+- JavaScript: camelCase para variables y funciones
+- Migraciones: prefijos numéricos (001_, 002_, etc.)

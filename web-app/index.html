@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="WINM - Sistema de control financiero personal">
+    <title>WINM - What I Need Most</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💰</text></svg>">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <header>
+        <h1>WINM</h1>
+        <p class="subtitle">What I Need Most</p>
+    </header>
+
+    <main>
+        <!-- Sección de autenticación -->
+        <section id="auth-section" class="auth-section">
+            <div class="auth-container">
+                <h2>Iniciar Sesión</h2>
+                <form id="login-form">
+                    <div class="form-group">
+                        <label for="email">Email</label>
+                        <input type="email" id="email" name="email" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="password">Contraseña</label>
+                        <input type="password" id="password" name="password" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Iniciar Sesión</button>
+                </form>
+                <p id="auth-error" class="error-message"></p>
+            </div>
+        </section>
+
+        <!-- Sección principal de transacciones -->
+        <section id="main-section" class="main-section hidden">
+            <div class="header-actions">
+                <button id="logout-btn" class="btn btn-secondary">Cerrar Sesión</button>
+            </div>
+
+            <div id="stats-container" class="stats-container">
+                <div class="stat-card">
+                    <h3>Total</h3>
+                    <p id="total-amount" class="stat-value">$0.00</p>
+                </div>
+                <div class="stat-card">
+                    <h3>Este Mes</h3>
+                    <p id="month-amount" class="stat-value">$0.00</p>
+                </div>
+            </div>
+
+            <div id="charts-container" class="charts-container">
+                <!-- Los gráficos se renderizarán aquí dinámicamente -->
+            </div>
+
+            <div class="transactions-container">
+                <h2>Transacciones</h2>
+                <div id="filters-container" class="filters-container">
+                    <!-- Los filtros se renderizarán aquí dinámicamente -->
+                </div>
+                <div class="search-container">
+                    <input type="text" id="search-input" placeholder="Buscar por descripción...">
+                </div>
+                <div id="transactions-list" class="transactions-list">
+                    <p class="loading">Cargando transacciones...</p>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <p>WINM - Sistema de control financiero personal</p>
+    </footer>
+
+    <!-- Modal de categorización -->
+    <div id="category-modal" class="modal">
+        <div class="modal-content">
+            <!-- El contenido se renderizará dinámicamente -->
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="js/config.js"></script>
+    <script type="module" src="js/app.js"></script>
+</body>
+</html>
