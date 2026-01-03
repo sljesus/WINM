@@ -39,7 +39,9 @@ export async function searchBankEmails(query, maxResults = 50, pageToken = null)
             throw new Error(`Error de Gmail API: ${response.status} ${response.statusText}`);
         }
 
-        return await response.json();
+        const responseData = await response.json();
+        console.log('🔍 Respuesta completa de Gmail API (searchBankEmails):', responseData);
+        return responseData;
     } catch (error) {
         console.error('Error buscando emails:', error);
         throw error;
@@ -74,6 +76,7 @@ export async function getEmailContent(messageId) {
         }
 
         const message = await response.json();
+        console.log('📧 Mensaje completo RAW de Gmail API (getEmailContent):', message);
 
         // Extraer headers
         const headers = message.payload?.headers || [];
