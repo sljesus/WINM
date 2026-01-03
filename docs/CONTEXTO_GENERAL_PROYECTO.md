@@ -87,7 +87,7 @@ Gmail API → Scripts Python → Supabase PostgreSQL → Frontend Web
 ```
 WINM/
 ├── supabase/
-│   ├── migrations/              # Migraciones SQL (001-007)
+│   ├── migrations/              # Migraciones SQL (001-008)
 │   │   ├── 001_initial_schema.sql
 │   │   ├── 002_improve_schema_for_sources.sql
 │   │   ├── 003_add_budgets_categories_rules.sql
@@ -95,6 +95,7 @@ WINM/
 │   │   ├── 005_fix_constraints_and_validations.sql
 │   │   ├── 006_add_edge_function_trigger.sql
 │   │   ├── 007_fix_security_service_key.sql
+│   │   ├── 008_fix_get_category_expenses_type.sql
 │   │   ├── test_schema.sql
 │   │   └── verify_complete.sql
 │   └── functions/
@@ -377,7 +378,7 @@ const CONFIG = {
 
 #### Base de Datos
 - ✅ 5 tablas principales creadas
-- ✅ 7 migraciones ejecutadas (001-007)
+- ✅ 8 migraciones ejecutadas (001-008)
 - ✅ RLS habilitado y configurado
 - ✅ 15 categorías del sistema insertadas
 - ✅ 8 funciones PL/pgSQL implementadas
@@ -486,7 +487,7 @@ const CONFIG = {
 
 ## 📊 Estado de Migraciones
 
-### Migraciones Ejecutadas (001-007)
+### Migraciones Ejecutadas (001-008)
 
 1. **001_initial_schema.sql** ✅
    - Tabla `transactions` básica
@@ -525,6 +526,11 @@ const CONFIG = {
    - Corrección de seguridad (elimina service_role_key hardcodeada)
    - Implementa webhook secret
    - Edge Function actualizada con validación
+
+8. **008_fix_get_category_expenses_type.sql** ✅
+   - Corrección de tipo de retorno en get_category_expenses
+   - CAST explícito a TEXT para category_name
+   - Compatibilidad mejorada con frontend
 
 **Estado:** ✅ Todas las migraciones ejecutadas correctamente
 
@@ -758,7 +764,7 @@ Estos elementos son opcionales y no bloquean el desarrollo:
 - **URL**: https://ioixblxanqcacqzlijps.supabase.co
 - **Project Ref**: ioixblxanqcacqzlijps
 - **Estado**: Proyecto vinculado con Supabase CLI
-- **Migraciones**: Todas ejecutadas (001-007)
+- **Migraciones**: Todas ejecutadas (001-008)
 
 ### Credenciales (No Exponer)
 - Service Role Key: En `.env` (scripts Python)
@@ -973,7 +979,7 @@ Para nuevos desarrolladores o nuevas sesiones:
 
 ### Fase 2: Base de Datos ✅
 - Esquema diseñado y validado
-- Migraciones 001-007 ejecutadas
+- Migraciones 001-008 ejecutadas
 - RLS y seguridad implementada
 
 ### Fase 3: Scripts Python ✅
@@ -1025,7 +1031,7 @@ Para nuevos desarrolladores o nuevas sesiones:
 
 ### Archivos Clave
 - **Configuración**: `.env`, `web-app/js/config.js`
-- **Migraciones**: `supabase/migrations/001-007.sql`
+- **Migraciones**: `supabase/migrations/001-008.sql`
 - **Scripts**: `scripts/main.py`, `scripts/utils/`
 - **Frontend**: `web-app/index.html`, `web-app/js/app.js`
 - **Edge Function**: `supabase/functions/send-budget-alert-email/index.ts`

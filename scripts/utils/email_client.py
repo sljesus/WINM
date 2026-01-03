@@ -156,6 +156,31 @@ def get_email_content(message_id: str) -> Dict:
         return {}
 
 
+def get_raw_message(message_id: str) -> Dict:
+    """
+    Obtiene el mensaje completo sin procesar para análisis.
+    Retorna el objeto Message completo de Gmail API.
+    
+    Args:
+        message_id: ID del mensaje
+    
+    Returns:
+        Dict: Objeto Message completo de Gmail API con payload estructurado
+    """
+    try:
+        service = get_gmail_service()
+        message = service.users().messages().get(
+            userId='me',
+            id=message_id,
+            format='full'
+        ).execute()
+        return message
+        
+    except HttpError as error:
+        print(f'Error obteniendo mensaje raw {message_id}: {error}')
+        return {}
+
+
 def _extract_body(payload: Dict) -> str:
     """
     Extrae el cuerpo del mensaje del payload.

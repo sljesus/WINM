@@ -84,7 +84,63 @@ export async function getSession() {
 }
 
 /**
+ * Inicia sesión con Google OAuth solicitando acceso a Gmail API
+ * @returns {Promise<Object>} Resultado del login OAuth
+ */
+export async function signInWithGoogle() {
+    try {
+        const client = getSupabaseClient();
+        const { data, error } = await client.auth.signInWithOAuth({
+            provider: 'google',
+            options: {
+                scopes: 'https://www.googleapis.com/auth/gmail.readonly',
+                queryParams: {
+                    access_type: 'offline',
+                    prompt: 'consent'
+                },
+                redirectTo: window.location.origin
+            }
+        });
+
+        if (error) throw error;
+        return { data, error: null };
+    } catch (error) {
+        console.error('Error en login con Google:', error);
+        return { data: null, error };
+    }
+}
+
+/**
+ * Obtiene el provider_token de la sesión actual
+ * @returns {Promise<string|null>} Provider token o null
+ */
+export async function getProviderToken() {
+    try {
+        const session = await getSession();
+        return session?.provider_token || null;
+    } catch (error) {
+        console.error('Error obteniendo provider token:', error);
+        return null;
+    }
+}
+
+/**
+ * Obtiene el provider_refresh_token de la sesión actual
+ * @returns {Promise<string|null>} Provider refresh token o null
+ */
+export async function getProviderRefreshToken() {
+    try {
+        const session = await getSession();
+        return session?.provider_refresh_token || null;
+    } catch (error) {
+        console.error('Error obteniendo provider refresh token:', error);
+        return null;
+    }
+}
+
+/**
  * Inicia sesión con email y contraseña
+ * @deprecated Usar signInWithGoogle() en su lugar. Mantenida para backward compatibility.
  * @param {string} email - Email del usuario
  * @param {string} password - Contraseña
  * @returns {Promise<Object>} Resultado del login
