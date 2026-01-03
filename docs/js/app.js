@@ -145,6 +145,8 @@ async function initializeApp() {
             if (event === 'SIGNED_OUT') {
                 showAuthSection();
             } else if (event === 'SIGNED_IN' && session) {
+                // Limpiar el hash de la URL después de la autenticación
+                window.history.replaceState(null, null, window.location.pathname);
                 showMainSection();
                 await initializeAppData();
                 await renderDashboard();
