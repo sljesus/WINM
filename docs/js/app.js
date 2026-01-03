@@ -120,6 +120,10 @@ async function initializeApp() {
         // Verificar sesión existente
         const hasSession = await checkSession();
         if (hasSession) {
+            // Limpiar el hash de la URL si existe (por seguridad)
+            if (window.location.hash) {
+                window.history.replaceState(null, null, window.location.pathname);
+            }
             showMainSection();
             // Inicializar modal de categorización
             await initCategoryModal(handleCategoryUpdated);
