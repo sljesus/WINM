@@ -241,3 +241,64 @@ export async function getRawMessage(messageId) {
 export async function getEmailList(query, maxResults = 50, pageToken = null) {
     return await searchBankEmails(query, maxResults, pageToken);
 }
+
+
+/**
+ * Función de prueba para Gmail API (disponible en window.testGmailAPI)
+ * Prueba la conexión y busca emails de bancos
+ */
+export async function testGmailAPI() {
+    console.log('🧪 Probando Gmail API...');
+
+    try {
+        // 1. Probar búsqueda de emails de bancos
+        console.log('🔍 Buscando emails de bancos...');
+        const query = 'from:@bbva.com OR from:@mercadopago.com OR from:@nu.com OR from:@plata.com.mx newer_than:7d';
+        const searchResult = await searchBankEmails(query, 5);
+
+        console.log('✅ Búsqueda exitosa:', searchResult);
+
+        if (searchResult.messages && searchResult.messages.length > 0) {
+            console.log(`📧 Encontrados ${searchResult.messages.length} emails`);
+
+            // 2. Probar obtener contenido del primer email
+            const firstMessageId = searchResult.messages[0].id;
+            console.log(`📖 Obteniendo contenido del email ${firstMessageId}...`);
+
+            const emailContent = await getEmailContent(firstMessageId);
+            console.log('✅ Contenido obtenido:', emailContent);
+
+            // 3. Mostrar información útil
+            console.log('📊 Resumen:');
+            console.log(`   - From: ${emailContent.from}`);
+            console.log(`   - Subject: ${emailContent.subject}`);
+            console.log(`   - Body length: ${emailContent.body.length} chars`);
+            console.log(`   - Snippet: ${emailContent.snippet}`);
+
+            return {
+                success: true,
+                emailsFound: searchResult.messages.length,
+                firstEmail: emailContent
+            };
+        } else {
+            console.log('⚠️ No se encontraron emails de bancos en los últimos 7 días');
+            return {
+                success: true,
+                emailsFound: 0,
+                message: 'No emails found'
+            };
+        }
+
+    } catch (error) {
+        console.error('❌ Error en test de Gmail API:', error);
+        return {
+            success: false,
+            error: error.message
+        };
+    }
+}
+
+// Hacer la función disponible globalmente para pruebas en consola
+if (typeof window !== 'undefined') {
+    window.testGmailAPI = testGmailAPI;
+}
