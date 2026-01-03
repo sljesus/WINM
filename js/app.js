@@ -2,19 +2,21 @@
 // JavaScript Vanilla - Sin frameworks
 // Refactorizado para usar módulos (SOLID + KISS)
 
+console.log('🚀 Cargando app.js...');
+
 // Importar servicios
-import { 
-    getSupabaseClient, 
-    checkSession, 
-    signIn, 
+import {
+    getSupabaseClient,
+    checkSession,
+    signIn,
     signInWithGoogle,
-    signOut, 
-    onAuthStateChange 
+    signOut,
+    onAuthStateChange
 } from './services/supabaseService.js';
 
 // Importar servicios de transacciones
-import { 
-    loadTransactions, 
+import {
+    loadTransactions,
     calculateStats,
     searchTransactions,
     getTransactionsByMonth
@@ -36,20 +38,20 @@ import { getMonthStart, getMonthEnd } from './utils/dateFormatter.js';
 import { formatCurrency } from './utils/currencyFormatter.js';
 
 // Importar servicios de gráficos
-import { 
-    getCategoryExpensesData, 
-    getMonthlyTrendsData, 
-    getTopCategoriesData 
+import {
+    getCategoryExpensesData,
+    getMonthlyTrendsData,
+    getTopCategoriesData
 } from './services/chartDataService.js';
 
 // Importar servicios de Supabase
 import { getCurrentUser } from './services/supabaseService.js';
 
 // Importar servicios de presupuestos (NUEVO)
-import { 
-    loadBudgets, 
-    createBudget, 
-    updateBudget, 
+import {
+    loadBudgets,
+    createBudget,
+    updateBudget,
     deleteBudget,
     loadBudgetAlerts,
     markAlertAsRead
@@ -60,10 +62,10 @@ import { createBudgetCard } from './components/BudgetCard.js';
 import { initBudgetModal, showBudgetModal, hideBudgetModal } from './components/BudgetModal.js';
 
 // Importar servicios de categorías (NUEVO)
-import { 
-    loadCategories, 
-    createCategory, 
-    updateCategory, 
+import {
+    loadCategories,
+    createCategory,
+    updateCategory,
     deleteCategory,
     getCategoryStats
 } from './services/categoryService.js';
@@ -73,10 +75,10 @@ import { createCategoryCard } from './components/CategoryCard.js';
 import { initCategoryManagementModal, showCategoryManagementModal, hideCategoryManagementModal } from './components/CategoryManagementModal.js';
 
 // Importar servicios de reglas (NUEVO)
-import { 
-    loadRules, 
-    createRule, 
-    updateRule, 
+import {
+    loadRules,
+    createRule,
+    updateRule,
     deleteRule,
     toggleRuleActive
 } from './services/ruleService.js';
@@ -84,6 +86,11 @@ import {
 // Importar componentes de reglas (NUEVO)
 import { createRuleCard } from './components/RuleCard.js';
 import { initRuleModal, showRuleModal, hideRuleModal } from './components/RuleModal.js';
+
+// Importar componente de importación de transacciones (REMOVIDO - ahora es automático)
+
+// Importar servicio de importación automática (NUEVO)
+import { importTransactionsFromGmail, isImportInProgress } from './services/transactionImportService.js';
 
 // Estado de filtros
 let currentFilters = {
@@ -106,20 +113,33 @@ document.addEventListener('DOMContentLoaded', () => {
  * Inicializar aplicación
  */
 async function initializeApp() {
+    console.log('🚀 Inicializando aplicación WINM...');
+
     try {
         // Verificar configuración (CONFIG está en window desde config.js)
         const config = window.CONFIG || (typeof CONFIG !== 'undefined' ? CONFIG : null);
         if (!config || !config.supabase || !config.supabase.url || !config.supabase.anonKey) {
+            console.error('❌ Configuración incompleta de Supabase');
             showError('Configuración incompleta. Por favor, edita config.js con tus credenciales de Supabase.');
             return;
         }
+
+        console.log('✅ Configuración de Supabase OK');
 
         // Inicializar cliente Supabase (singleton)
         getSupabaseClient();
 
         // Verificar sesión existente
+        console.log('🔐 Verificando sesión de usuario...');
         const hasSession = await checkSession();
+        console.log(`🔐 Sesión encontrada: ${hasSession}`);
+
         if (hasSession) {
+            console.log('✅ Usuario autenticado, inicializando aplicación principal...');
+            // Limpiar el hash de la URL si existe (por seguridad)
+            if (window.location.hash) {
+                window.history.replaceState(null, null, window.location.pathname);
+            }
             showMainSection();
             // Inicializar modal de categorización
             await initCategoryModal(handleCategoryUpdated);
@@ -130,10 +150,13 @@ async function initializeApp() {
             // Inicializar modal de gestión de reglas (NUEVO)
             await initRuleModal(handleRuleUpdated);
             // Inicializar datos de la aplicación
+            console.log('📊 Inicializando datos de la aplicación...');
             await initializeAppData();
             // Renderizar dashboard
+            console.log('📈 Renderizando dashboard...');
             await renderDashboard();
         } else {
+            console.log('❌ No hay sesión, mostrando pantalla de autenticación');
             showAuthSection();
         }
 
@@ -143,15 +166,22 @@ async function initializeApp() {
         // Escuchar cambios de autenticación
         onAuthStateChange(async (event, session) => {
             if (event === 'SIGNED_OUT') {
+                console.log('👋 Usuario cerró sesión');
                 showAuthSection();
             } else if (event === 'SIGNED_IN' && session) {
+                console.log('✅ Usuario inició sesión');
+                // Limpiar el hash de la URL después de la autenticación
+                window.history.replaceState(null, null, window.location.pathname);
                 showMainSection();
                 await initializeAppData();
                 await renderDashboard();
             }
         });
+
+        console.log('✅ Inicialización de aplicación completada');
     } catch (error) {
-        console.error('Error inicializando aplicación:', error);
+        console.error('❌ Error inicializando aplicación:', error);
+        console.error('Stack trace:', error.stack);
         showError('Error al inicializar la aplicación');
     }
 }
@@ -197,6 +227,12 @@ function setupEventListeners() {
             showRuleModal(null);
         });
     }
+
+    // Event listener para importar transacciones manualmente
+    const importTransactionsBtn = document.getElementById('import-transactions-btn');
+    if (importTransactionsBtn) {
+        importTransactionsBtn.addEventListener('click', handleManualImport);
+    }
 }
 
 /**
@@ -204,7 +240,7 @@ function setupEventListeners() {
  */
 function setupNavigation() {
     const navTabs = document.querySelectorAll('.nav-tab');
-    
+
     navTabs.forEach(tab => {
         tab.addEventListener('click', () => {
             const sectionName = tab.getAttribute('data-section');
@@ -269,9 +305,9 @@ async function handleGoogleSignIn() {
 
     try {
         const { data, error } = await signInWithGoogle();
-        
+
         if (error) throw error;
-        
+
         // El redirect de OAuth manejará el resto del flujo
         // onAuthStateChange se encargará de inicializar la app cuando regrese
         // No necesitamos hacer nada más aquí, el flujo OAuth redirige automáticamente
@@ -287,7 +323,7 @@ async function handleGoogleSignIn() {
  */
 async function handleLogin(e) {
     e.preventDefault();
-    
+
     const email = document.getElementById('email').value;
     const password = document.getElementById('password').value;
     const errorElement = document.getElementById('auth-error');
@@ -326,6 +362,76 @@ async function handleLogout() {
 }
 
 /**
+ * Manejar importación manual de transacciones desde Gmail
+ */
+async function handleManualImport() {
+    const importBtn = document.getElementById('import-transactions-btn');
+    const originalText = importBtn.innerHTML;
+
+    try {
+        // Verificar si ya hay una importación en progreso
+        if (isImportInProgress()) {
+            alert('Ya hay una importación en progreso. Por favor, espera a que termine.');
+            return;
+        }
+
+        // Cambiar texto del botón para mostrar progreso
+        importBtn.innerHTML = '<span style="margin-right: 0.5rem;">⏳</span>Importando...';
+        importBtn.disabled = true;
+
+        console.log('🚀 Iniciando importación manual de transacciones...');
+
+        // Ejecutar importación
+        const result = await importTransactionsFromGmail(
+            {
+                daysBack: 30,  // Buscar emails de los últimos 30 días
+                maxEmails: 100, // Máximo 100 emails
+                skipDuplicates: true
+            },
+            (message, data) => {
+                // Callback de progreso - actualizar botón
+                importBtn.innerHTML = `<span style="margin-right: 0.5rem;">⏳</span>${message}`;
+                console.log(`📊 Import progreso: ${message}`, data || '');
+            },
+            (error) => {
+                // Callback de error
+                console.error('❌ Error en importación manual:', error);
+                alert(`Error al importar transacciones: ${error.message || 'Error desconocido'}`);
+            }
+        );
+
+        console.log('📋 Resultado de importación manual:', result);
+
+        // Si se importaron transacciones, recargar datos
+        if (result && result.transactionsImported > 0) {
+            console.log(`✅ Importación manual completada: ${result.transactionsImported} transacciones importadas`);
+
+            // Recargar transacciones y actualizar UI
+            await reloadTransactionsAfterImport();
+
+            // Mostrar notificación de éxito
+            alert(`✅ Importación completada exitosamente!\n\n📊 Resumen:\n• Emails encontrados: ${result.emailsFound}\n• Transacciones importadas: ${result.transactionsImported}\n• Duplicados omitidos: ${result.skippedDuplicates || 0}`);
+        } else {
+            console.log('ℹ️ Importación manual completada: no se encontraron nuevas transacciones');
+
+            let message = 'No se encontraron nuevas transacciones para importar.';
+            if (result) {
+                message += `\n\n📊 Detalles:\n• Emails encontrados: ${result.emailsFound}\n• Transacciones encontradas: ${result.transactionsFound || 0}\n• Duplicados omitidos: ${result.skippedDuplicates || 0}`;
+            }
+            alert(message);
+        }
+
+    } catch (error) {
+        console.error('❌ Error general en importación manual:', error);
+        alert(`Error al importar transacciones: ${error.message || 'Error desconocido'}`);
+    } finally {
+        // Restaurar botón
+        importBtn.innerHTML = originalText;
+        importBtn.disabled = false;
+    }
+}
+
+/**
  * Mostrar sección de autenticación
  */
 function showAuthSection() {
@@ -355,7 +461,7 @@ async function renderDashboard() {
 
         // Renderizar estadísticas (con todas las transacciones)
         renderStats(allTransactions);
-        
+
         // Renderizar gráficos
         await renderCharts();
     } catch (error) {
@@ -433,17 +539,17 @@ function handleFilterChange(filters) {
  */
 function applyFilters(transactions) {
     let filtered = [...transactions];
-    
+
     // Filtro por categoría
     if (currentFilters.category) {
         filtered = filtered.filter(t => t.category_id === currentFilters.category);
     }
-    
+
     // Filtro por fuente
     if (currentFilters.source) {
         filtered = filtered.filter(t => t.source === currentFilters.source);
     }
-    
+
     // Filtro por tipo
     if (currentFilters.type) {
         if (currentFilters.type === 'income') {
@@ -454,17 +560,17 @@ function applyFilters(transactions) {
             filtered = filtered.filter(t => t.transaction_type === 'retiro');
         }
     }
-    
+
     // Filtro por período
     if (currentFilters.period !== 'all') {
         filtered = filterByPeriod(filtered, currentFilters.period);
     }
-    
+
     // Búsqueda por texto
     if (currentFilters.search) {
         filtered = searchTransactions(filtered, currentFilters.search);
     }
-    
+
     return filtered;
 }
 
@@ -508,11 +614,11 @@ function handleCategoryUpdated(updatedTransaction) {
     if (index !== -1) {
         allTransactions[index] = updatedTransaction;
     }
-    
+
     // Re-renderizar con filtros aplicados
     const filteredTransactions = applyFilters(allTransactions);
     renderTransactions(filteredTransactions);
-    
+
     // Re-renderizar estadísticas
     renderStats(allTransactions);
 }
@@ -522,7 +628,7 @@ function handleCategoryUpdated(updatedTransaction) {
  */
 function renderTransactions(transactions) {
     const transactionsList = document.getElementById('transactions-list');
-    
+
     if (!transactions || transactions.length === 0) {
         transactionsList.innerHTML = '<p class="loading">No hay transacciones que coincidan con los filtros.</p>';
         return;
@@ -567,8 +673,8 @@ function renderStats(transactions) {
     const monthBalanceNet = stats.monthIncome + stats.monthExpenses;
 
     // Calcular promedio mensual de gastos (solo si hay datos)
-    const avgMonthlyExpenses = stats.count > 0 
-        ? Math.abs(stats.totalExpenses) / Math.max(1, Math.ceil(stats.count / 30)) 
+    const avgMonthlyExpenses = stats.count > 0
+        ? Math.abs(stats.totalExpenses) / Math.max(1, Math.ceil(stats.count / 30))
         : 0;
 
     // Crear tarjetas usando componente
@@ -618,9 +724,9 @@ async function renderCharts() {
         console.warn('Elemento charts-container no encontrado en el DOM');
         return;
     }
-    
+
     chartsContainer.innerHTML = '<p class="loading">Cargando gráficos...</p>';
-    
+
     try {
         // Obtener usuario actual
         const user = await getCurrentUser();
@@ -628,11 +734,11 @@ async function renderCharts() {
             chartsContainer.innerHTML = '<p class="error-message">Usuario no autenticado</p>';
             return;
         }
-        
+
         // Calcular fechas (últimos 6 meses)
         const now = new Date();
         const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 6, 1);
-        
+
         // Cargar datos en paralelo
         const [categoryData, trendData, topData] = await Promise.all([
             getCategoryExpensesData(user.id, sixMonthsAgo, now, 8).catch(err => {
@@ -648,28 +754,28 @@ async function renderCharts() {
                 return null;
             })
         ]);
-        
+
         chartsContainer.innerHTML = '';
-        
+
         const pairedContainer = document.createElement('div');
         pairedContainer.className = 'paired-charts-container';
-        
+
         if (categoryData) {
             pairedContainer.appendChild(createCategoryExpenseChart('category-chart', categoryData));
         }
-        
+
         if (topData) {
             pairedContainer.appendChild(createTopCategoriesChart('top-chart', topData));
         }
-        
+
         if (pairedContainer.children.length > 0) {
             chartsContainer.appendChild(pairedContainer);
         }
-        
+
         if (trendData) {
             chartsContainer.appendChild(createMonthlyTrendChart('trend-chart', trendData));
         }
-        
+
         if (pairedContainer.children.length === 0 && !trendData) {
             chartsContainer.innerHTML = '<p class="loading">No hay datos suficientes para mostrar gráficos</p>';
         }
@@ -677,6 +783,243 @@ async function renderCharts() {
         console.error('Error renderizando gráficos:', error);
         chartsContainer.innerHTML = '<p class="error-message">Error al cargar gráficos</p>';
     }
+}
+
+
+/**
+ * Recargar transacciones después de una importación
+ */
+async function reloadTransactionsAfterImport() {
+    try {
+        console.log('Recargando transacciones después de importación...');
+
+        // Recargar transacciones
+        allTransactions = await loadTransactions({ limit: 200 });
+
+        // Actualizar dashboard
+        renderStats(allTransactions);
+        await renderCharts();
+
+        // Actualizar sección de transacciones si está visible
+        const transactionsSection = document.getElementById('section-transactions');
+        if (transactionsSection && transactionsSection.classList.contains('active')) {
+            const filteredTransactions = applyFilters(allTransactions);
+            renderTransactions(filteredTransactions);
+        }
+
+        console.log('Transacciones recargadas exitosamente');
+    } catch (error) {
+        console.error('Error recargando transacciones:', error);
+        alert('Error al recargar las transacciones');
+    }
+}
+
+/**
+ * Importar transacciones automáticamente al iniciar la aplicación (NUEVO)
+ */
+async function autoImportTransactions() {
+    console.log('🔄 Verificando si ejecutar importación automática...');
+
+    try {
+        // Verificar si ya hay una importación en progreso
+        if (isImportInProgress()) {
+            console.log('❌ Importación automática omitida: ya hay una importación en progreso');
+            return;
+        }
+
+        console.log(`📊 Total de transacciones cargadas: ${allTransactions.length}`);
+
+        // Verificar si el usuario tiene transacciones recientes (últimas 24 horas)
+        // Si tiene transacciones recientes, probablemente ya importó recientemente
+        const now = new Date();
+        const yesterday = new Date(now);
+        yesterday.setDate(yesterday.getDate() - 1);
+
+        console.log(`📅 Verificando transacciones desde: ${yesterday.toISOString()}`);
+
+        const recentTransactions = allTransactions.filter(transaction => {
+            const transactionDate = new Date(transaction.date);
+            return transactionDate >= yesterday;
+        });
+
+        console.log(`⏰ Transacciones recientes encontradas: ${recentTransactions.length}`);
+
+        if (recentTransactions.length > 0) {
+            console.log('❌ Importación automática omitida: hay transacciones recientes (últimas 24 horas)');
+            console.log('📋 Últimas transacciones recientes:', recentTransactions.slice(0, 3).map(t => ({
+                description: t.description,
+                date: t.date,
+                amount: t.amount
+            })));
+            return;
+        }
+
+        console.log('✅ No hay transacciones recientes, procediendo con importación automática...');
+        console.log('🚀 Iniciando importación automática de transacciones...');
+
+        // Mostrar indicador de carga en el dashboard
+        const dashboardSection = document.getElementById('section-dashboard');
+        if (dashboardSection) {
+            const loadingIndicator = document.createElement('div');
+            loadingIndicator.id = 'auto-import-indicator';
+            loadingIndicator.className = 'loading-indicator';
+            loadingIndicator.innerHTML = `
+                <div class="loading-spinner"></div>
+                <span>Importando transacciones recientes...</span>
+            `;
+            loadingIndicator.style.cssText = `
+                display: flex;
+                align-items: center;
+                gap: 0.5rem;
+                padding: 1rem;
+                background: #f0f8ff;
+                border: 1px solid #add8e6;
+                border-radius: 4px;
+                margin: 1rem 0;
+                font-size: 0.9rem;
+                color: #2c5aa0;
+            `;
+
+            // Insertar después del título del dashboard
+            const dashboardTitle = dashboardSection.querySelector('h2, h1');
+            if (dashboardTitle) {
+                dashboardTitle.insertAdjacentElement('afterend', loadingIndicator);
+            }
+        }
+
+        console.log('⚙️ Configuración de importación:', {
+            daysBack: 7,
+            maxEmails: 50,
+            skipDuplicates: true
+        });
+
+        // Ejecutar importación automática
+        const result = await importTransactionsFromGmail(
+            {
+                daysBack: 7,  // Buscar emails de los últimos 7 días
+                maxEmails: 50, // Máximo 50 emails
+                skipDuplicates: true
+            },
+            (message, data) => {
+                // Callback de progreso - actualizar indicador
+                const indicator = document.getElementById('auto-import-indicator');
+                if (indicator) {
+                    const span = indicator.querySelector('span');
+                    if (span) {
+                        span.textContent = message;
+                    }
+                }
+                console.log(`📊 Auto-import progreso: ${message}`, data || '');
+            },
+            (error) => {
+                // Callback de error - mostrar pero no alertar
+                console.error('❌ Error en importación automática:', error);
+                const indicator = document.getElementById('auto-import-indicator');
+                if (indicator) {
+                    indicator.innerHTML = `
+                        <span style="color: #d32f2f;">⚠️ Error al importar transacciones automáticamente</span>
+                    `;
+                    // Remover indicador después de 3 segundos
+                    setTimeout(() => {
+                        if (indicator.parentNode) {
+                            indicator.parentNode.removeChild(indicator);
+                        }
+                    }, 3000);
+                }
+            }
+        );
+
+        console.log('📋 Resultado de importación automática:', result);
+
+        // Remover indicador de carga
+        const indicator = document.getElementById('auto-import-indicator');
+        if (indicator) {
+            indicator.parentNode.removeChild(indicator);
+        }
+
+        // Si se importaron transacciones, recargar datos
+        if (result && result.transactionsImported > 0) {
+            console.log(`✅ Importación automática completada: ${result.transactionsImported} transacciones importadas`);
+            console.log('🔄 Recargando datos de la aplicación...');
+
+            // Recargar transacciones y actualizar UI
+            await reloadTransactionsAfterImport();
+
+            // Mostrar notificación de éxito discreta
+            showAutoImportSuccess(result.transactionsImported);
+        } else {
+            console.log('ℹ️ Importación automática completada: no se encontraron nuevas transacciones');
+            if (result) {
+                console.log(`   - Emails encontrados: ${result.emailsFound || 0}`);
+                console.log(`   - Transacciones encontradas: ${result.transactionsFound || 0}`);
+                console.log(`   - Duplicados omitidos: ${result.skippedDuplicates || 0}`);
+            }
+        }
+
+    } catch (error) {
+        console.error('❌ Error general en importación automática:', error);
+        console.error('Stack trace:', error.stack);
+
+        // Remover indicador de carga si existe
+        const indicator = document.getElementById('auto-import-indicator');
+        if (indicator && indicator.parentNode) {
+            indicator.parentNode.removeChild(indicator);
+        }
+
+        // No mostrar alertas para errores de importación automática
+        // Solo loggear para no interrumpir la experiencia del usuario
+    }
+
+    console.log('🏁 Fin del proceso de importación automática');
+}
+
+/**
+ * Mostrar notificación de éxito de importación automática
+ */
+function showAutoImportSuccess(count) {
+    // Crear notificación temporal
+    const notification = document.createElement('div');
+    notification.className = 'auto-import-success';
+    notification.innerHTML = `
+        <span>✅ ${count} transacción${count !== 1 ? 'es' : ''} importada${count !== 1 ? 's' : ''} automáticamente</span>
+    `;
+    notification.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: #4caf50;
+        color: white;
+        padding: 1rem 1.5rem;
+        border-radius: 4px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+        z-index: 1000;
+        font-size: 0.9rem;
+        animation: slideIn 0.3s ease-out;
+    `;
+
+    // Agregar animación CSS
+    const style = document.createElement('style');
+    style.textContent = `
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+    `;
+    document.head.appendChild(style);
+
+    document.body.appendChild(notification);
+
+    // Remover después de 4 segundos
+    setTimeout(() => {
+        if (notification.parentNode) {
+            notification.style.animation = 'slideIn 0.3s ease-in reverse';
+            setTimeout(() => {
+                if (notification.parentNode) {
+                    notification.parentNode.removeChild(notification);
+                }
+            }, 300);
+        }
+    }, 4000);
 }
 
 /**
@@ -771,7 +1114,7 @@ async function renderBudgetAlerts() {
         alerts.forEach(alert => {
             const alertItem = document.createElement('div');
             alertItem.className = 'budget-alert-item';
-            
+
             if (alert.alert_type === 'exceeded') {
                 alertItem.classList.add('budget-alert-item--exceeded');
             }
@@ -821,11 +1164,11 @@ async function handleCreateBudget(budgetData) {
     try {
         // Llamar a createBudget
         const createdBudget = await createBudget(budgetData);
-        
+
         // Actualizar vista
         await renderBudgets();
         await renderBudgetAlerts();
-        
+
         return createdBudget;
     } catch (error) {
         console.error('Error creando presupuesto:', error);
@@ -853,7 +1196,7 @@ async function handleDeleteBudget(budgetId) {
     try {
         // Llamar a deleteBudget
         await deleteBudget(budgetId);
-        
+
         // Actualizar vista
         await renderBudgets();
         await renderBudgetAlerts();
@@ -912,7 +1255,7 @@ async function renderCategories() {
                 <span class="section-title-text">Categorías del Sistema</span>
                 <span class="section-toggle-icon">▼</span>
             `;
-            
+
             const systemContent = document.createElement('div');
             systemContent.className = 'categories-section-content';
             systemContent.style.display = 'grid';
@@ -961,7 +1304,7 @@ async function renderCategories() {
                 <span class="section-title-text">Mis Categorías</span>
                 <span class="section-toggle-icon">▼</span>
             `;
-            
+
             const customContent = document.createElement('div');
             customContent.className = 'categories-section-content';
             customContent.style.display = 'grid';
@@ -1033,10 +1376,10 @@ async function handleCreateCategory(categoryData) {
     try {
         // Llamar a createCategory
         const createdCategory = await createCategory(categoryData);
-        
+
         // Actualizar vista
         await renderCategories();
-        
+
         return createdCategory;
     } catch (error) {
         console.error('Error creando categoría:', error);
@@ -1071,7 +1414,7 @@ async function handleDeleteCategory(categoryId) {
         // Obtener la categoría para validar
         const categories = await loadCategories();
         const category = categories.find(cat => cat.id === categoryId);
-        
+
         if (!category) {
             alert('Categoría no encontrada');
             return;
@@ -1100,7 +1443,7 @@ async function handleDeleteCategory(categoryId) {
 
         // Llamar a deleteCategory
         await deleteCategory(categoryId);
-        
+
         // Actualizar vista
         await renderCategories();
     } catch (error) {
@@ -1235,10 +1578,10 @@ async function handleCreateRule(ruleData) {
     try {
         // Llamar a createRule
         const createdRule = await createRule(ruleData);
-        
+
         // Actualizar vista
         await renderRules();
-        
+
         return createdRule;
     } catch (error) {
         console.error('Error creando regla:', error);
@@ -1266,7 +1609,7 @@ async function handleDeleteRule(ruleId) {
     try {
         // Llamar a deleteRule
         await deleteRule(ruleId);
-        
+
         // Actualizar vista
         await renderRules();
     } catch (error) {
@@ -1282,7 +1625,7 @@ async function handleToggleRule(ruleId, isActive) {
     try {
         // Llamar a toggleRuleActive
         await toggleRuleActive(ruleId, isActive);
-        
+
         // Actualizar vista
         await renderRules();
     } catch (error) {
@@ -1308,36 +1651,36 @@ window.testGmailAPI = async function() {
         // Importar servicios dinámicamente
         const { searchBankEmails } = await import('./services/gmailAPIService.js');
         const { getRawMessage } = await import('./services/gmailAPIService.js');
-        
+
         console.log('🔍 Buscando emails de bancos...');
-        
+
         // Buscar emails de bancos
         const query = "from:bbva.com OR from:mercadopago.com OR from:nu.com.mx OR from:plata.com.mx newer_than:7d";
         const results = await searchBankEmails(query, 1);
-        
+
         if (!results.messages || results.messages.length === 0) {
             console.log('❌ No se encontraron emails de bancos');
             return;
         }
-        
+
         const messageId = results.messages[0].id;
         console.log(`✅ Email encontrado. ID: ${messageId}`);
         console.log('📧 Obteniendo estructura RAW completa...\n');
-        
+
         // Obtener mensaje RAW completo
         const rawMessage = await getRawMessage(messageId);
-        
+
         // Mostrar estructura completa en consola
         console.log('='.repeat(80));
         console.log('ESTRUCTURA COMPLETA DEL MENSAJE RAW DE GMAIL API');
         console.log('='.repeat(80));
         console.log(JSON.stringify(rawMessage, null, 2));
-        
+
         // También guardar en variable global para inspección
         window.lastGmailRawMessage = rawMessage;
         console.log('\n✅ Mensaje RAW guardado en: window.lastGmailRawMessage');
         console.log('   Puedes inspeccionarlo en la consola escribiendo: window.lastGmailRawMessage');
-        
+
         return rawMessage;
     } catch (error) {
         console.error('❌ Error:', error);

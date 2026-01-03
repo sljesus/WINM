@@ -85,6 +85,12 @@ import {
 import { createRuleCard } from './components/RuleCard.js';
 import { initRuleModal, showRuleModal, hideRuleModal } from './components/RuleModal.js';
 
+// Importar componente de importación de transacciones (NUEVO)
+import { addTransactionImportButton } from './components/TransactionImportButton.js';
+
+// Importar servicio de importación automática (NUEVO)
+import { importTransactionsFromGmail, isImportInProgress } from './services/transactionImportService.js';
+
 // Estado de filtros
 let currentFilters = {
     category: null,
@@ -106,20 +112,29 @@ document.addEventListener('DOMContentLoaded', () => {
  * Inicializar aplicación
  */
 async function initializeApp() {
+    console.log('🚀 Inicializando aplicación WINM...');
+
     try {
         // Verificar configuración (CONFIG está en window desde config.js)
         const config = window.CONFIG || (typeof CONFIG !== 'undefined' ? CONFIG : null);
         if (!config || !config.supabase || !config.supabase.url || !config.supabase.anonKey) {
+            console.error('❌ Configuración incompleta de Supabase');
             showError('Configuración incompleta. Por favor, edita config.js con tus credenciales de Supabase.');
             return;
         }
+
+        console.log('✅ Configuración de Supabase OK');
 
         // Inicializar cliente Supabase (singleton)
         getSupabaseClient();
 
         // Verificar sesión existente
+        console.log('🔐 Verificando sesión de usuario...');
         const hasSession = await checkSession();
+        console.log(`🔐 Sesión encontrada: ${hasSession}`);
+
         if (hasSession) {
+            console.log('✅ Usuario autenticado, inicializando aplicación principal...');
             // Limpiar el hash de la URL si existe (por seguridad)
             if (window.location.hash) {
                 window.history.replaceState(null, null, window.location.pathname);
@@ -134,10 +149,13 @@ async function initializeApp() {
             // Inicializar modal de gestión de reglas (NUEVO)
             await initRuleModal(handleRuleUpdated);
             // Inicializar datos de la aplicación
+            console.log('📊 Inicializando datos de la aplicación...');
             await initializeAppData();
             // Renderizar dashboard
+            console.log('📈 Renderizando dashboard...');
             await renderDashboard();
         } else {
+            console.log('❌ No hay sesión, mostrando pantalla de autenticación');
             showAuthSection();
         }
 
@@ -147,8 +165,10 @@ async function initializeApp() {
         // Escuchar cambios de autenticación
         onAuthStateChange(async (event, session) => {
             if (event === 'SIGNED_OUT') {
+                console.log('👋 Usuario cerró sesión');
                 showAuthSection();
             } else if (event === 'SIGNED_IN' && session) {
+                console.log('✅ Usuario inició sesión');
                 // Limpiar el hash de la URL después de la autenticación
                 window.history.replaceState(null, null, window.location.pathname);
                 showMainSection();
@@ -156,8 +176,11 @@ async function initializeApp() {
                 await renderDashboard();
             }
         });
+
+        console.log('✅ Inicialización de aplicación completada');
     } catch (error) {
-        console.error('Error inicializando aplicación:', error);
+        console.error('❌ Error inicializando aplicación:', error);
+        console.error('Stack trace:', error.stack);
         showError('Error al inicializar la aplicación');
     }
 }
@@ -361,9 +384,12 @@ async function renderDashboard() {
 
         // Renderizar estadísticas (con todas las transacciones)
         renderStats(allTransactions);
-        
+
         // Renderizar gráficos
         await renderCharts();
+
+        // Agregar botón de importación de transacciones (NUEVO)
+        await renderImportButton();
     } catch (error) {
         console.error('Error renderizando dashboard:', error);
     }
@@ -389,6 +415,9 @@ async function initializeAppData() {
             const filteredTransactions = applyFilters(allTransactions);
             renderTransactions(filteredTransactions);
         }
+
+        // Importar transacciones automáticamente al iniciar la app (NUEVO)
+        await autoImportTransactions();
     } catch (error) {
         console.error('Error inicializando datos de la aplicación:', error);
     }
@@ -683,6 +712,297 @@ async function renderCharts() {
         console.error('Error renderizando gráficos:', error);
         chartsContainer.innerHTML = '<p class="error-message">Error al cargar gráficos</p>';
     }
+}
+
+/**
+ * Renderizar botón de importación de transacciones (NUEVO)
+ */
+async function renderImportButton() {
+    try {
+        const dashboardSection = document.getElementById('section-dashboard');
+        if (!dashboardSection) {
+            console.warn('Sección de dashboard no encontrada');
+            return;
+        }
+
+        // Buscar contenedor de acciones del dashboard
+        let actionsContainer = dashboardSection.querySelector('.dashboard-actions');
+        if (!actionsContainer) {
+            // Crear contenedor de acciones si no existe
+            actionsContainer = document.createElement('div');
+            actionsContainer.className = 'dashboard-actions';
+
+            // Insertar después del título del dashboard
+            const dashboardTitle = dashboardSection.querySelector('h2, h1');
+            if (dashboardTitle) {
+                dashboardTitle.insertAdjacentElement('afterend', actionsContainer);
+            } else {
+                dashboardSection.insertBefore(actionsContainer, dashboardSection.firstChild);
+            }
+        }
+
+        // Limpiar contenedor
+        actionsContainer.innerHTML = '';
+
+        // Agregar botón de importación
+        const importButton = addTransactionImportButton(
+            actionsContainer,
+            (result) => {
+                // Callback cuando la importación se complete exitosamente
+                console.log('Importación completada:', result);
+
+                // Recargar transacciones para mostrar las nuevas
+                reloadTransactionsAfterImport();
+            },
+            (error) => {
+                // Callback cuando hay error
+                console.error('Error en importación:', error);
+                alert('Error durante la importación: ' + error.message);
+            }
+        );
+
+        if (!importButton) {
+            console.error('Error creando botón de importación');
+        }
+    } catch (error) {
+        console.error('Error renderizando botón de importación:', error);
+    }
+}
+
+/**
+ * Recargar transacciones después de una importación
+ */
+async function reloadTransactionsAfterImport() {
+    try {
+        console.log('Recargando transacciones después de importación...');
+
+        // Recargar transacciones
+        allTransactions = await loadTransactions({ limit: 200 });
+
+        // Actualizar dashboard
+        renderStats(allTransactions);
+        await renderCharts();
+
+        // Actualizar sección de transacciones si está visible
+        const transactionsSection = document.getElementById('section-transactions');
+        if (transactionsSection && transactionsSection.classList.contains('active')) {
+            const filteredTransactions = applyFilters(allTransactions);
+            renderTransactions(filteredTransactions);
+        }
+
+        console.log('Transacciones recargadas exitosamente');
+    } catch (error) {
+        console.error('Error recargando transacciones:', error);
+        alert('Error al recargar las transacciones');
+    }
+}
+
+/**
+ * Importar transacciones automáticamente al iniciar la aplicación (NUEVO)
+ */
+async function autoImportTransactions() {
+    console.log('🔄 Verificando si ejecutar importación automática...');
+
+    try {
+        // Verificar si ya hay una importación en progreso
+        if (isImportInProgress()) {
+            console.log('❌ Importación automática omitida: ya hay una importación en progreso');
+            return;
+        }
+
+        console.log(`📊 Total de transacciones cargadas: ${allTransactions.length}`);
+
+        // Verificar si el usuario tiene transacciones recientes (últimas 24 horas)
+        // Si tiene transacciones recientes, probablemente ya importó recientemente
+        const now = new Date();
+        const yesterday = new Date(now);
+        yesterday.setDate(yesterday.getDate() - 1);
+
+        console.log(`📅 Verificando transacciones desde: ${yesterday.toISOString()}`);
+
+        const recentTransactions = allTransactions.filter(transaction => {
+            const transactionDate = new Date(transaction.date);
+            return transactionDate >= yesterday;
+        });
+
+        console.log(`⏰ Transacciones recientes encontradas: ${recentTransactions.length}`);
+
+        if (recentTransactions.length > 0) {
+            console.log('❌ Importación automática omitida: hay transacciones recientes (últimas 24 horas)');
+            console.log('📋 Últimas transacciones recientes:', recentTransactions.slice(0, 3).map(t => ({
+                description: t.description,
+                date: t.date,
+                amount: t.amount
+            })));
+            return;
+        }
+
+        console.log('✅ No hay transacciones recientes, procediendo con importación automática...');
+        console.log('🚀 Iniciando importación automática de transacciones...');
+
+        // Mostrar indicador de carga en el dashboard
+        const dashboardSection = document.getElementById('section-dashboard');
+        if (dashboardSection) {
+            const loadingIndicator = document.createElement('div');
+            loadingIndicator.id = 'auto-import-indicator';
+            loadingIndicator.className = 'loading-indicator';
+            loadingIndicator.innerHTML = `
+                <div class="loading-spinner"></div>
+                <span>Importando transacciones recientes...</span>
+            `;
+            loadingIndicator.style.cssText = `
+                display: flex;
+                align-items: center;
+                gap: 0.5rem;
+                padding: 1rem;
+                background: #f0f8ff;
+                border: 1px solid #add8e6;
+                border-radius: 4px;
+                margin: 1rem 0;
+                font-size: 0.9rem;
+                color: #2c5aa0;
+            `;
+
+            // Insertar después del título del dashboard
+            const dashboardTitle = dashboardSection.querySelector('h2, h1');
+            if (dashboardTitle) {
+                dashboardTitle.insertAdjacentElement('afterend', loadingIndicator);
+            }
+        }
+
+        console.log('⚙️ Configuración de importación:', {
+            daysBack: 7,
+            maxEmails: 50,
+            skipDuplicates: true
+        });
+
+        // Ejecutar importación automática
+        const result = await importTransactionsFromGmail(
+            {
+                daysBack: 7,  // Buscar emails de los últimos 7 días
+                maxEmails: 50, // Máximo 50 emails
+                skipDuplicates: true
+            },
+            (message, data) => {
+                // Callback de progreso - actualizar indicador
+                const indicator = document.getElementById('auto-import-indicator');
+                if (indicator) {
+                    const span = indicator.querySelector('span');
+                    if (span) {
+                        span.textContent = message;
+                    }
+                }
+                console.log(`📊 Auto-import progreso: ${message}`, data || '');
+            },
+            (error) => {
+                // Callback de error - mostrar pero no alertar
+                console.error('❌ Error en importación automática:', error);
+                const indicator = document.getElementById('auto-import-indicator');
+                if (indicator) {
+                    indicator.innerHTML = `
+                        <span style="color: #d32f2f;">⚠️ Error al importar transacciones automáticamente</span>
+                    `;
+                    // Remover indicador después de 3 segundos
+                    setTimeout(() => {
+                        if (indicator.parentNode) {
+                            indicator.parentNode.removeChild(indicator);
+                        }
+                    }, 3000);
+                }
+            }
+        );
+
+        console.log('📋 Resultado de importación automática:', result);
+
+        // Remover indicador de carga
+        const indicator = document.getElementById('auto-import-indicator');
+        if (indicator) {
+            indicator.parentNode.removeChild(indicator);
+        }
+
+        // Si se importaron transacciones, recargar datos
+        if (result && result.transactionsImported > 0) {
+            console.log(`✅ Importación automática completada: ${result.transactionsImported} transacciones importadas`);
+            console.log('🔄 Recargando datos de la aplicación...');
+
+            // Recargar transacciones y actualizar UI
+            await reloadTransactionsAfterImport();
+
+            // Mostrar notificación de éxito discreta
+            showAutoImportSuccess(result.transactionsImported);
+        } else {
+            console.log('ℹ️ Importación automática completada: no se encontraron nuevas transacciones');
+            if (result) {
+                console.log(`   - Emails encontrados: ${result.emailsFound || 0}`);
+                console.log(`   - Transacciones encontradas: ${result.transactionsFound || 0}`);
+                console.log(`   - Duplicados omitidos: ${result.skippedDuplicates || 0}`);
+            }
+        }
+
+    } catch (error) {
+        console.error('❌ Error general en importación automática:', error);
+        console.error('Stack trace:', error.stack);
+
+        // Remover indicador de carga si existe
+        const indicator = document.getElementById('auto-import-indicator');
+        if (indicator && indicator.parentNode) {
+            indicator.parentNode.removeChild(indicator);
+        }
+
+        // No mostrar alertas para errores de importación automática
+        // Solo loggear para no interrumpir la experiencia del usuario
+    }
+
+    console.log('🏁 Fin del proceso de importación automática');
+}
+
+/**
+ * Mostrar notificación de éxito de importación automática
+ */
+function showAutoImportSuccess(count) {
+    // Crear notificación temporal
+    const notification = document.createElement('div');
+    notification.className = 'auto-import-success';
+    notification.innerHTML = `
+        <span>✅ ${count} transacción${count !== 1 ? 'es' : ''} importada${count !== 1 ? 's' : ''} automáticamente</span>
+    `;
+    notification.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: #4caf50;
+        color: white;
+        padding: 1rem 1.5rem;
+        border-radius: 4px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+        z-index: 1000;
+        font-size: 0.9rem;
+        animation: slideIn 0.3s ease-out;
+    `;
+
+    // Agregar animación CSS
+    const style = document.createElement('style');
+    style.textContent = `
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+    `;
+    document.head.appendChild(style);
+
+    document.body.appendChild(notification);
+
+    // Remover después de 4 segundos
+    setTimeout(() => {
+        if (notification.parentNode) {
+            notification.style.animation = 'slideIn 0.3s ease-in reverse';
+            setTimeout(() => {
+                if (notification.parentNode) {
+                    notification.parentNode.removeChild(notification);
+                }
+            }, 300);
+        }
+    }, 4000);
 }
 
 /**

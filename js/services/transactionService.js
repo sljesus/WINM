@@ -241,6 +241,40 @@ export async function getCategories() {
 }
 
 /**
+ * Crea una nueva transacción
+ * @param {Object} transactionData - Datos de la transacción
+ * @returns {Promise<Object>} Transacción creada
+ */
+export async function createTransaction(transactionData) {
+    try {
+        const client = getSupabaseClient();
+        const { data: { user } } = await client.auth.getUser();
+
+        if (!user) {
+            throw new Error('Usuario no autenticado');
+        }
+
+        // Agregar user_id a los datos
+        const dataToInsert = {
+            ...transactionData,
+            user_id: user.id
+        };
+
+        const { data, error } = await client
+            .from('transactions')
+            .insert(dataToInsert)
+            .select('*, categories(name, icon, color)')
+            .single();
+
+        if (error) throw error;
+        return data;
+    } catch (error) {
+        console.error('Error creando transacción:', error);
+        throw error;
+    }
+}
+
+/**
  * Obtiene las fuentes/bancos únicos del usuario
  * @returns {Promise<Array>} Array de fuentes únicas
  */
@@ -248,7 +282,7 @@ export async function getSources() {
     try {
         const client = getSupabaseClient();
         const { data: { user } } = await client.auth.getUser();
-        
+
         if (!user) {
             throw new Error('Usuario no autenticado');
         }
@@ -260,7 +294,7 @@ export async function getSources() {
             .not('source', 'is', null);
 
         if (error) throw error;
-        
+
         // Obtener valores únicos
         const uniqueSources = [...new Set((data || []).map(t => t.source))];
         return uniqueSources.sort();

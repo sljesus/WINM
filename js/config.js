@@ -1,6 +1,8 @@
 // Configuración de WINM
 // Editar estos valores con tus credenciales de Supabase
 
+console.log('🔧 Cargando config.js...');
+
 const CONFIG = {
     supabase: {
         url: 'https://ioixblxanqcacqzlijps.supabase.co',
