@@ -1298,3 +1298,49 @@ function handleRuleUpdated(updatedRule) {
     // Actualizar vista de reglas
     renderRules();
 }
+
+/**
+ * Función global para analizar estructura RAW de Gmail API
+ * Ejecutar desde consola del navegador: window.testGmailAPI()
+ */
+window.testGmailAPI = async function() {
+    try {
+        // Importar servicios dinámicamente
+        const { searchBankEmails } = await import('./services/gmailAPIService.js');
+        const { getRawMessage } = await import('./services/gmailAPIService.js');
+        
+        console.log('🔍 Buscando emails de bancos...');
+        
+        // Buscar emails de bancos
+        const query = "from:bbva.com OR from:mercadopago.com OR from:nu.com.mx OR from:plata.com.mx newer_than:7d";
+        const results = await searchBankEmails(query, 1);
+        
+        if (!results.messages || results.messages.length === 0) {
+            console.log('❌ No se encontraron emails de bancos');
+            return;
+        }
+        
+        const messageId = results.messages[0].id;
+        console.log(`✅ Email encontrado. ID: ${messageId}`);
+        console.log('📧 Obteniendo estructura RAW completa...\n');
+        
+        // Obtener mensaje RAW completo
+        const rawMessage = await getRawMessage(messageId);
+        
+        // Mostrar estructura completa en consola
+        console.log('='.repeat(80));
+        console.log('ESTRUCTURA COMPLETA DEL MENSAJE RAW DE GMAIL API');
+        console.log('='.repeat(80));
+        console.log(JSON.stringify(rawMessage, null, 2));
+        
+        // También guardar en variable global para inspección
+        window.lastGmailRawMessage = rawMessage;
+        console.log('\n✅ Mensaje RAW guardado en: window.lastGmailRawMessage');
+        console.log('   Puedes inspeccionarlo en la consola escribiendo: window.lastGmailRawMessage');
+        
+        return rawMessage;
+    } catch (error) {
+        console.error('❌ Error:', error);
+        throw error;
+    }
+};

@@ -68,6 +68,10 @@ def get_gmail_service():
                 )
             
             flow = InstalledAppFlow.from_client_secrets_file(credentials_path, SCOPES)
+            print("\n⚠️  IMPORTANTE: Se abrirá el navegador para autenticación.")
+            print("   Asegúrate de que tu OAuth Client en Google Cloud Console esté configurado como 'Desktop app'")
+            print("   y que tengas registrado 'http://localhost' en Authorized redirect URIs\n")
+            # Usar port=0 para puerto dinámico (mejor práctica para desktop apps)
             creds = flow.run_local_server(port=0)
         
         # Guardar token para próximas ejecuciones

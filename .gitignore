@@ -40,3 +40,4 @@ token.json
 *.tmp
 *.temp
 .cache/
+client_secret*.json
