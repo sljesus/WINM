@@ -26,24 +26,65 @@ class BaseEmailParser {
      * @returns {number|null} Monto extraído o null
      */
     extractAmount(text) {
-        // Patrones comunes: $1,234.56, 1234.56, 1,234.56 MXN, etc.
+        // Limpiar texto primero
+        const cleanText = this.cleanAmountText(text);
+
+        // Patrones mejorados para montos
         const patterns = [
-            /\$[\s]*([\d,]+\.?\d*)/,  // $1,234.56
-            /([\d,]+\.?\d*)[\s]*(?:MXN|pesos|peso)/i,  // 1234.56 MXN
-            /([\d,]+\.?\d*)/  // 1234.56
+            // Monto con símbolo de peso mexicano
+            /(?:MXN?|\$)\s*([\d,]+\.?\d*)/i,
+            // Monto con palabras
+            /([\d,]+\.?\d*)\s*(?:MXN|pesos|peso|mxn)/i,
+            // Monto solo con números (más estricto)
+            /\b(\d{1,3}(?:,\d{3})*(?:\.\d{2})?)\b/
         ];
 
+        console.log('🔍 extractAmount - Texto limpio:', cleanText.substring(0, 200));
+
         for (const pattern of patterns) {
-            const match = text.replace(/,/g, '').match(pattern);
-            if (match) {
-                const amount = parseFloat(match[1]);
-                if (!isNaN(amount)) {
+            console.log('🔍 Probando patrón:', pattern);
+            const match = cleanText.match(pattern);
+            if (match && match[1]) {
+                // Limpiar comas y convertir
+                const cleanAmount = match[1].replace(/,/g, '');
+                const amount = parseFloat(cleanAmount);
+
+                console.log('🔍 Monto extraído del match:', match[1], '->', amount);
+
+                if (!isNaN(amount) && amount > 0) {
+                    console.log('✅ Monto válido encontrado:', amount);
                     return amount;
+                } else {
+                    console.log('❌ Monto inválido o cero:', amount);
                 }
             }
         }
 
+        console.log('❌ No se encontró monto válido en el texto');
         return null;
+    }
+
+    /**
+     * Limpia el texto para extracción de montos
+     */
+    cleanAmountText(text) {
+        if (!text) return '';
+
+        // Remover HTML y CSS
+        let clean = text.replace(/<[^>]+>/g, ' ');
+        clean = clean.replace(/style\s*=\s*["'][^"']*["']/gi, ' ');
+        clean = clean.replace(/class\s*=\s*["'][^"']*["']/gi, ' ');
+
+        // Remover URLs
+        clean = clean.replace(/https?:\/\/[^\s]+/g, ' ');
+
+        // Mantener solo números, puntos, comas, espacios y símbolos de moneda
+        clean = clean.replace(/[^\d\s.,$MXNmxn]/g, ' ');
+
+        // Normalizar espacios
+        clean = clean.replace(/\s+/g, ' ');
+
+        return clean.trim();
     }
 
     /**
@@ -214,18 +255,35 @@ class MercadoPagoEmailParser extends BaseEmailParser {
         // Extraer fecha
         const date = this.extractDate(body, emailDate);
 
+        // Validar que el monto no sea cero
+        if (amount === 0) {
+            console.log('❌ Monto es cero, omitiendo transacción');
+            return null;
+        }
+
+        // Validar source (debe ser uno de los valores permitidos por BD)
+        const validSources = ['Mercado Pago', 'BBVA', 'NU', 'Plata Card'];
+        const source = validSources.includes(this.sourceName) ? this.sourceName : 'Mercado Pago';
+
         // Construir transacción
         const transaction = {
             amount: isExpense ? -Math.abs(amount) : Math.abs(amount),
             description: description,
             date: date,
-            source: this.sourceName,
+            source: source, // Solo valores permitidos por BD
             transaction_type: transactionType,
             email_id: emailId,
             email_subject: subject,
             needs_categorization: false, // Mercado Pago generalmente tiene descripción clara
-            bank: this.sourceName
+            bank: source
         };
+
+        console.log('📊 Transacción Mercado Pago creada:', {
+            amount: transaction.amount,
+            description: transaction.description,
+            date: transaction.date,
+            source: transaction.source
+        });
 
         return this.validateTransaction(transaction) ? transaction : null;
     }
@@ -246,33 +304,155 @@ class MercadoPagoEmailParser extends BaseEmailParser {
     }
 
     extractDescription(body, subject) {
-        const text = body || subject;
+        // Limpiar el contenido HTML primero
+        const cleanBody = this.cleanHtmlContent(body || '');
+        const cleanSubject = this.cleanSubject(subject || '');
+        const combinedText = `${cleanSubject} ${cleanBody}`.trim();
 
-        // Patrones comunes en emails de Mercado Pago
+        // Patrones mejorados para contenido real de transacciones
         const patterns = [
-            /(?:Compra|Pago)\s+(?:en|a|de)\s+([^\n.]+)/i,
-            /Concepto[:\s]+([^\n.]+)/i,
-            /Descripción[:\s]+([^\n.]+)/i,
-            /([A-Z][^\.\n]{10,50})/  // Frase que empieza con mayúscula
+            // Compra específica
+            /(?:compraste|pago|pagaste)\s+(?:en|a|de)\s+([^.!?\n]{3,50})/i,
+            /(?:compra|gasto)\s+(?:en|a|de)\s+([^.!?\n]{3,50})/i,
+
+            // Transferencia/envío
+            /(?:enviaste|transferiste)\s+(?:a|para)\s+([^.!?\n]{3,50})/i,
+            /(?:recibiste|te\s+enviaron)\s+(?:de|desde)\s+([^.!?\n]{3,50})/i,
+
+            // Servicios específicos
+            /(?:servicio|suscripción)\s+(?:de|a)\s+([^.!?\n]{3,50})/i,
+            /(?:cargo|débito)\s+(?:por|de)\s+([^.!?\n]{3,50})/i,
+
+            // Concepto general
+            /concepto[:\s]*([^.!?\n]{3,50})/i,
+            /descripción[:\s]*([^.!?\n]{3,50})/i,
+
+            // Descripción general (último recurso)
+            /([A-Z][^.!?\n]{10,60}(?:compra|pago|transferencia|ingreso|gasto))/i
         ];
 
         for (const pattern of patterns) {
-            const match = text.match(pattern);
-            if (match) {
-                let desc = match[1];
-                // Limpiar descripción
-                desc = desc.replace(/(Mercado Pago|MP)[:\s]*/gi, '');
-                return this.normalizeDescription(desc);
+            const match = combinedText.match(pattern);
+            if (match && match[1]) {
+                let desc = match[1].trim();
+
+                // Validar que no sea CSS o HTML
+                if (this.isValidDescription(desc)) {
+                    // Limpiar palabras comunes
+                    desc = desc.replace(/(?:mercado pago|mp|bbva|nu|plata|transferencia|banco)[:\s]*/gi, '');
+                    return this.normalizeDescription(desc);
+                }
             }
         }
 
-        // Fallback
-        if (subject) {
-            let desc = subject.replace(/^(Mercado Pago|MP|Notificación)[:\s]*/gi, '');
-            return this.normalizeDescription(desc);
+        // Fallback con subject limpio
+        if (cleanSubject) {
+            return this.normalizeDescription(cleanSubject);
         }
 
-        return this.normalizeDescription(text.substring(0, 100) || 'Transacción Mercado Pago');
+        // Último fallback
+        return this.normalizeDescription('Transacción procesada');
+    }
+
+    /**
+     * Limpia contenido HTML y CSS del body del email
+     */
+    cleanHtmlContent(text) {
+        if (!text) return '';
+
+        // Remover estilos CSS completos
+        text = text.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
+
+        // Remover atributos de estilo y clase
+        text = text.replace(/style\s*=\s*["'][^"']*["']/gi, '');
+        text = text.replace(/class\s*=\s*["'][^"']*["']/gi, '');
+        text = text.replace(/id\s*=\s*["'][^"']*["']/gi, '');
+
+        // Remover todos los tags HTML
+        text = text.replace(/<[^>]+>/g, ' ');
+
+        // Remover URLs
+        text = text.replace(/https?:\/\/[^\s]+/g, '');
+
+        // Remover patrones CSS comunes
+        text = text.replace(/\b(display|font|color|background|margin|padding|border|width|height)\s*:\s*[^;]+;?/gi, '');
+        text = text.replace(/\{[^}]*\}/g, ''); // Remover bloques CSS
+        text = text.replace(/url\([^)]+\)/gi, ''); // Remover url() de CSS
+
+        // Remover caracteres que no son letras, números, espacios o puntuación básica
+        text = text.replace(/[^\w\sáéíóúüñ¿¡.,-]/g, ' ');
+
+        // Normalizar espacios
+        text = text.replace(/\s+/g, ' ');
+
+        // Filtrar líneas que parecen código
+        const lines = text.split('\n');
+        const cleanLines = lines.filter(line => {
+            const trimmed = line.trim();
+            if (trimmed.length < 3) return false;
+
+            // Filtrar líneas que parecen CSS o código
+            const cssPatterns = [
+                /display\s*:/i,
+                /font-/i,
+                /color\s*:/i,
+                /background/i,
+                /margin/i,
+                /padding/i,
+                /text-align/i,
+                /important/i,
+                /px|em|rem/i,
+                /#[0-9a-f]{3,6}/i, // Colores hex
+                /rgb\(/i,
+                /\{|\}/, // Llaves CSS
+                /@media/i,
+                /@import/i
+            ];
+
+            for (const pattern of cssPatterns) {
+                if (pattern.test(trimmed)) return false;
+            }
+
+            return true;
+        });
+
+        return cleanLines.join(' ').trim();
+    }
+
+    /**
+     * Limpia el subject del email
+     */
+    cleanSubject(subject) {
+        if (!subject) return '';
+
+        // Remover prefijos comunes
+        let clean = subject.replace(/^(?:mercado pago|mp|bbva|nu|plata|notificación|alerta)[:\s-]*/gi, '');
+
+        // Remover caracteres especiales
+        clean = clean.replace(/[^\w\sáéíóúüñ¿¡.,]/g, ' ');
+
+        return clean.trim();
+    }
+
+    /**
+     * Valida que una descripción sea válida (no CSS, no HTML)
+     */
+    isValidDescription(text) {
+        if (!text || text.length < 3) return false;
+
+        // No debe contener caracteres de CSS
+        if (/[{};:@#]/.test(text)) return false;
+
+        // No debe ser muy largo sin sentido
+        if (text.length > 100) return false;
+
+        // Debe contener al menos una letra
+        if (!/[a-záéíóúüñ]/i.test(text)) return false;
+
+        // No debe empezar con minúscula seguida de mayúscula (patrón CSS)
+        if (/^[a-z][A-Z]/.test(text)) return false;
+
+        return true;
     }
 }
 
@@ -299,6 +479,12 @@ class BBVAEmailParser extends BaseEmailParser {
             return null;
         }
 
+        // Validar que el monto no sea cero
+        if (amount === 0) {
+            console.log('❌ Monto es cero, omitiendo transacción BBVA');
+            return null;
+        }
+
         const fullText = (body + ' ' + subject).toLowerCase();
         const transactionType = this.determineTransactionType(fullText);
         const isExpense = ['compra', 'retiro', 'transferencia'].includes(transactionType);
@@ -306,17 +492,28 @@ class BBVAEmailParser extends BaseEmailParser {
         const description = this.extractDescription(body, subject);
         const date = this.extractDate(body, emailDate);
 
+        // Validar source (debe ser uno de los valores permitidos por BD)
+        const validSources = ['Mercado Pago', 'BBVA', 'NU', 'Plata Card'];
+        const source = validSources.includes(this.sourceName) ? this.sourceName : 'BBVA';
+
         const transaction = {
             amount: isExpense ? -Math.abs(amount) : Math.abs(amount),
             description: description,
             date: date,
-            source: this.sourceName,
+            source: source, // Solo valores permitidos por BD
             transaction_type: transactionType,
             email_id: emailId,
             email_subject: subject,
             needs_categorization: transactionType === 'retiro',
-            bank: this.sourceName
+            bank: source
         };
+
+        console.log('📊 Transacción BBVA creada:', {
+            amount: transaction.amount,
+            description: transaction.description,
+            date: transaction.date,
+            source: transaction.source
+        });
 
         return this.validateTransaction(transaction) ? transaction : null;
     }
@@ -336,23 +533,8 @@ class BBVAEmailParser extends BaseEmailParser {
     }
 
     extractDescription(body, subject) {
-        const text = body || subject;
-
-        // Patrones para BBVA
-        const patterns = [
-            /(?:Cargo|Compra|Pago)\s+(?:en|a)\s+([^\n.]+)/i,
-            /Concepto[:\s]+([^\n.]+)/i,
-            /([A-Z][^\.\n]{10,50})/
-        ];
-
-        for (const pattern of patterns) {
-            const match = text.match(pattern);
-            if (match) {
-                return this.normalizeDescription(match[1]);
-            }
-        }
-
-        return this.normalizeDescription(text.substring(0, 100) || 'Transacción BBVA');
+        // Usar los métodos mejorados de la clase base
+        return super.extractDescription(body, subject) || 'Transacción BBVA';
     }
 }
 
@@ -379,6 +561,12 @@ class NUEmailParser extends BaseEmailParser {
             return null;
         }
 
+        // Validar que el monto no sea cero
+        if (amount === 0) {
+            console.log('❌ Monto es cero, omitiendo transacción NU');
+            return null;
+        }
+
         const fullText = (body + ' ' + subject).toLowerCase();
         let transactionType = 'compra';
         let isExpense = true;
@@ -394,17 +582,28 @@ class NUEmailParser extends BaseEmailParser {
         const description = this.extractDescription(body, subject);
         const date = this.extractDate(body, emailDate);
 
+        // Validar source (debe ser uno de los valores permitidos por BD)
+        const validSources = ['Mercado Pago', 'BBVA', 'NU', 'Plata Card'];
+        const source = validSources.includes(this.sourceName) ? this.sourceName : 'NU';
+
         const transaction = {
             amount: isExpense ? -Math.abs(amount) : Math.abs(amount),
             description: description,
             date: date,
-            source: this.sourceName,
+            source: source, // Solo valores permitidos por BD
             transaction_type: transactionType,
             email_id: emailId,
             email_subject: subject,
             needs_categorization: false,
-            bank: this.sourceName
+            bank: source
         };
+
+        console.log('📊 Transacción NU creada:', {
+            amount: transaction.amount,
+            description: transaction.description,
+            date: transaction.date,
+            source: transaction.source
+        });
 
         return this.validateTransaction(transaction) ? transaction : null;
     }
@@ -424,30 +623,9 @@ class NUEmailParser extends BaseEmailParser {
     }
 
     extractDescription(body, subject) {
-        const text = body || subject;
-
-        // Patrones para NU
-        const patterns = [
-            /(?:Compra|Pago)\s+(?:en|a|de)\s+([^\n.]+)/i,
-            /Concepto[:\s]+([^\n.]+)/i,
-            /([A-Z][^\.\n]{10,50})/
-        ];
-
-        for (const pattern of patterns) {
-            const match = text.match(pattern);
-            if (match) {
-                let desc = match[1];
-                desc = desc.replace(/(NU|Notificación)[:\s]*/gi, '');
-                return this.normalizeDescription(desc);
-            }
-        }
-
-        if (subject) {
-            let desc = subject.replace(/^(NU|Notificación)[:\s]*/gi, '');
-            return this.normalizeDescription(desc);
-        }
-
-        return this.normalizeDescription(text.substring(0, 100) || 'Transacción NU');
+        // Usar los métodos mejorados de la clase base
+        const result = super.extractDescription(body, subject);
+        return result ? result.replace(/(NU|Notificación)[:\s]*/gi, '') : 'Transacción NU';
     }
 }
 
@@ -474,6 +652,12 @@ class PlataCardEmailParser extends BaseEmailParser {
             return null;
         }
 
+        // Validar que el monto no sea cero
+        if (amount === 0) {
+            console.log('❌ Monto es cero, omitiendo transacción Plata Card');
+            return null;
+        }
+
         const fullText = (body + ' ' + subject).toLowerCase();
         let transactionType = 'compra';
         let isExpense = true;
@@ -489,17 +673,28 @@ class PlataCardEmailParser extends BaseEmailParser {
         const description = this.extractDescription(body, subject);
         const date = this.extractDate(body, emailDate);
 
+        // Validar source (debe ser uno de los valores permitidos por BD)
+        const validSources = ['Mercado Pago', 'BBVA', 'NU', 'Plata Card'];
+        const source = validSources.includes(this.sourceName) ? this.sourceName : 'Plata Card';
+
         const transaction = {
             amount: isExpense ? -Math.abs(amount) : Math.abs(amount),
             description: description,
             date: date,
-            source: this.sourceName,
+            source: source, // Solo valores permitidos por BD
             transaction_type: transactionType,
             email_id: emailId,
             email_subject: subject,
             needs_categorization: false,
-            bank: this.sourceName
+            bank: source
         };
+
+        console.log('📊 Transacción Plata Card creada:', {
+            amount: transaction.amount,
+            description: transaction.description,
+            date: transaction.date,
+            source: transaction.source
+        });
 
         return this.validateTransaction(transaction) ? transaction : null;
     }
@@ -519,30 +714,9 @@ class PlataCardEmailParser extends BaseEmailParser {
     }
 
     extractDescription(body, subject) {
-        const text = body || subject;
-
-        // Patrones para Plata Card
-        const patterns = [
-            /(?:Compra|Pago)\s+(?:en|a|de)\s+([^\n.]+)/i,
-            /Concepto[:\s]+([^\n.]+)/i,
-            /([A-Z][^\.\n]{10,50})/
-        ];
-
-        for (const pattern of patterns) {
-            const match = text.match(pattern);
-            if (match) {
-                let desc = match[1];
-                desc = desc.replace(/(Plata Card|Plata|Notificación)[:\s]*/gi, '');
-                return this.normalizeDescription(desc);
-            }
-        }
-
-        if (subject) {
-            let desc = subject.replace(/^(Plata Card|Plata|Notificación)[:\s]*/gi, '');
-            return this.normalizeDescription(desc);
-        }
-
-        return this.normalizeDescription(text.substring(0, 100) || 'Transacción Plata Card');
+        // Usar los métodos mejorados de la clase base
+        const result = super.extractDescription(body, subject);
+        return result ? result.replace(/(Plata Card|Plata|Notificación)[:\s]*/gi, '') : 'Transacción Plata Card';
     }
 }
 

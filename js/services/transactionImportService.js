@@ -3,7 +3,7 @@
 // Principio KISS: Simple y directo
 
 import { searchBankEmails, getEmailContent } from './gmailAPIService.js';
-import { parseEmailTransaction } from '../parsers/emailParsers.js';
+import { EmailAnalyzerFactory } from './analyzers/EmailAnalyzerFactory.js';
 import { createTransaction } from './transactionService.js';
 
 /**
@@ -15,6 +15,28 @@ class TransactionImportService {
         this.isImporting = false;
         this.progressCallback = null;
         this.errorCallback = null;
+        this.emailAnalyzer = null;
+        this._initializeAnalyzer();
+    }
+
+    /**
+     * Inicializa el analizador de emails basado en configuración
+     */
+    _initializeAnalyzer() {
+        try {
+            // Obtener configuración de IA (KISS: configuración simple)
+            const aiConfig = window.CONFIG?.ai || {
+                useOpenAI: false,
+                openaiApiKey: null,
+                useRegex: true
+            };
+
+            this.emailAnalyzer = EmailAnalyzerFactory.create(aiConfig);
+            console.log('✅ TransactionImportService: Analizador de emails inicializado');
+        } catch (error) {
+            console.warn('⚠️ TransactionImportService: Error inicializando analizador, usando regex únicamente:', error);
+            this.emailAnalyzer = EmailAnalyzerFactory.createRegexOnly();
+        }
     }
 
     /**
@@ -166,8 +188,8 @@ class TransactionImportService {
                     continue;
                 }
 
-                // Parsear transacción
-                const transaction = parseEmailTransaction(emailContent);
+                // Analizar email con el sistema de IA (KISS: una sola línea cambió)
+                const transaction = await this.emailAnalyzer.analyzeEmail(emailContent);
 
                 if (transaction) {
                     // Verificar duplicados si es necesario
@@ -177,7 +199,8 @@ class TransactionImportService {
                     }
 
                     transactions.push(transaction);
-                    this.reportProgress(`Transacción extraída: ${transaction.description} - $${Math.abs(transaction.amount).toFixed(2)}`);
+                    const analyzerInfo = transaction.analyzer_used ? ` (${transaction.analyzer_used})` : '';
+                    this.reportProgress(`Transacción extraída${analyzerInfo}: ${transaction.description} - $${Math.abs(transaction.amount).toFixed(2)}`);
                 } else {
                     this.reportProgress(`No se pudo extraer transacción del email ${emailInfo.id}`);
                 }
@@ -262,10 +285,18 @@ class TransactionImportService {
                 saved++;
                 this.reportProgress(`Guardando transacción ${saved}/${transactions.length}...`);
 
-                // Agregar campos requeridos para Supabase
+                // Filtrar solo campos que existen en la base de datos
                 const transactionData = {
-                    ...transaction,
-                    // Los campos ya están en el formato correcto del parser
+                    amount: transaction.amount,
+                    description: transaction.description,
+                    date: transaction.date,
+                    source: transaction.source,
+                    transaction_type: transaction.transaction_type,
+                    email_id: transaction.email_id,
+                    email_subject: transaction.email_subject,
+                    needs_categorization: transaction.needs_categorization,
+                    bank: transaction.bank
+                    // Removidos: analyzed_by_ai, confidence, analyzer_used (no existen en BD)
                 };
 
                 const savedTransaction = await createTransaction(transactionData);
