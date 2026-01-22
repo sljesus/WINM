@@ -246,7 +246,7 @@ export async function getCategories() {
  * @param {Object} transactionData - Datos de la transacción
  * @returns {Promise<Object>} Transacción creada
  */
-export async function createTransaction(transactionData) {
+async function createTransaction(transactionData) {
     try {
         const client = getSupabaseClient();
         const { data: { user } } = await client.auth.getUser();
@@ -305,5 +305,15 @@ export async function getSources() {
     }
 }
 
-// Exportación explícita adicional para asegurar compatibilidad
-export { createTransaction };
+// Exportar todas las funciones al final para asegurar compatibilidad con GitHub Pages
+export { 
+    loadTransactions,
+    calculateStats,
+    getTransactionsByMonth,
+    getTransactionsByCategory,
+    searchTransactions,
+    updateCategory,
+    getCategories,
+    createTransaction,
+    getSources
+};
