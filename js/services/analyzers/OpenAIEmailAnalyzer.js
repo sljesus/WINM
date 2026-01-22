@@ -13,27 +13,36 @@ export class OpenAIEmailAnalyzer extends IEmailAnalyzer {
     constructor(apiKey) {
         super();
         this.name = 'OpenAIEmailAnalyzer';
-        this.apiKey = apiKey;
+        // apiKey ya no se usa directamente, pero mantenemos el parámetro por compatibilidad
+        this.apiKey = apiKey; // Deprecated: ahora se usa Edge Function
         this.initialized = false;
         this.categoriesCache = null;
         this.categoriesLoaded = false;
+        this.supabaseUrl = null;
+        this.supabaseAnonKey = null;
     }
 
     /**
-     * Inicializa el analizador (valida API key y carga categorías)
+     * Inicializa el analizador (carga configuración de Supabase y categorías)
      */
     async initialize() {
         if (this.initialized) return;
 
-        if (!this.apiKey) {
-            throw new Error('OpenAI API key no proporcionada');
+        // Obtener configuración de Supabase desde CONFIG global
+        const config = window.CONFIG || (typeof CONFIG !== 'undefined' ? CONFIG : null);
+        
+        if (!config || !config.supabase || !config.supabase.url || !config.supabase.anonKey) {
+            throw new Error('Configuración de Supabase incompleta. Verifica config.js');
         }
+
+        this.supabaseUrl = config.supabase.url;
+        this.supabaseAnonKey = config.supabase.anonKey;
 
         // Cargar categorías para categorización automática
         await this._loadCategories();
 
         this.initialized = true;
-        console.log(`✅ ${this.name}: Analizador OpenAI inicializado con ${this.categoriesCache?.length || 0} categorías`);
+        console.log(`✅ ${this.name}: Analizador OpenAI inicializado (usando Edge Function) con ${this.categoriesCache?.length || 0} categorías`);
     }
 
     /**
@@ -56,7 +65,7 @@ export class OpenAIEmailAnalyzer extends IEmailAnalyzer {
     }
 
     /**
-     * Analiza email usando OpenAI
+     * Analiza email usando OpenAI a través de Edge Function (seguro)
      * @param {Object} emailContent - Contenido del email
      * @returns {Promise<Object|null>} Transacción extraída o null
      */
@@ -64,50 +73,54 @@ export class OpenAIEmailAnalyzer extends IEmailAnalyzer {
         try {
             await this.initialize();
 
-            console.log(`🤖 ${this.name}: Analizando email ${emailContent.id} con IA`);
+            console.log(`🤖 ${this.name}: Analizando email ${emailContent.id} con IA (Edge Function)`);
 
-            const prompt = this._buildAnalysisPrompt(emailContent);
-
-            // Llamar a OpenAI API usando fetch
-            const apiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+            // Llamar a la Edge Function de Supabase (proxy seguro)
+            const edgeFunctionUrl = `${this.supabaseUrl}/functions/v1/analyze-email`;
+            
+            const apiResponse = await fetch(edgeFunctionUrl, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${this.apiKey}`
+                    'Authorization': `Bearer ${this.supabaseAnonKey}`
                 },
                 body: JSON.stringify({
-                    model: 'gpt-3.5-turbo', // Usar GPT-3.5 para ahorrar costos
-                    messages: [
-                        {
-                            role: 'system',
-                            content: 'Eres un experto en análisis de emails bancarios mexicanos. Extrae información precisa de transacciones financieras. Responde únicamente con JSON válido.'
-                        },
-                        {
-                            role: 'user',
-                            content: prompt
-                        }
-                    ],
-                    temperature: 0.1, // Baja temperatura para respuestas consistentes
-                    max_tokens: 300
+                    emailContent: {
+                        id: emailContent.id,
+                        subject: emailContent.subject || '',
+                        body: emailContent.body || '',
+                        from: emailContent.from || '',
+                        date: emailContent.date || new Date().toISOString()
+                    },
+                    categories: this.categoriesCache || []
                 })
             });
 
             if (!apiResponse.ok) {
-                throw new Error(`OpenAI API error: ${apiResponse.status} ${apiResponse.statusText}`);
+                const errorData = await apiResponse.json().catch(() => ({ error: apiResponse.statusText }));
+                throw new Error(`Edge Function error: ${apiResponse.status} - ${errorData.error || apiResponse.statusText}`);
             }
 
             const data = await apiResponse.json();
-            let response = data.choices[0].message.content;
 
-            // Limpiar respuesta: remover wrappers de markdown si existen
-            response = response.replace(/^```json\s*/, '').replace(/\s*```$/, '').trim();
+            if (!data.success || !data.transaction) {
+                console.warn(`⚠️ ${this.name}: Edge Function no pudo extraer transacción`);
+                return null;
+            }
 
-            console.log(`🤖 ${this.name}: Respuesta de OpenAI (limpia):`, response);
+            // La Edge Function ya devuelve la transacción formateada
+            const transaction = data.transaction;
 
-            return this._parseAndValidateResponse(response, emailContent);
+            // Agregar metadatos adicionales
+            transaction.confidence = data.confidence || 0.8;
+            transaction.analyzed_by_ai = true;
+            transaction.analyzer_used = this.name;
+
+            console.log(`✅ ${this.name}: Transacción extraída: ${transaction.description} - $${transaction.amount}`);
+            return transaction;
 
         } catch (error) {
-            console.error(`❌ ${this.name}: Error en análisis con OpenAI:`, error);
+            console.error(`❌ ${this.name}: Error en análisis con OpenAI (Edge Function):`, error);
             return null;
         }
     }

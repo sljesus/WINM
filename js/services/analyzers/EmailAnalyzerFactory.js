@@ -35,10 +35,11 @@ export class EmailAnalyzerFactory {
         }
 
         // Agregar OpenAI si está configurado y habilitado
-        if (useOpenAI && openaiApiKey) {
+        // Ya no requiere apiKey (se usa Edge Function segura)
+        if (useOpenAI) {
             try {
-                analyzers.push(new OpenAIEmailAnalyzer(openaiApiKey));
-                console.log('✅ EmailAnalyzerFactory: OpenAI analyzer agregado');
+                analyzers.push(new OpenAIEmailAnalyzer(null)); // apiKey deprecated
+                console.log('✅ EmailAnalyzerFactory: OpenAI analyzer agregado (usando Edge Function)');
             } catch (error) {
                 console.warn('⚠️ EmailAnalyzerFactory: Error creando OpenAI analyzer:', error);
             }
@@ -70,14 +71,12 @@ export class EmailAnalyzerFactory {
 
     /**
      * Crea un analizador con OpenAI únicamente
-     * @param {string} apiKey - API key de OpenAI
+     * @param {string} apiKey - API key de OpenAI (deprecated: ya no se usa, se usa Edge Function)
      * @returns {OpenAIEmailAnalyzer} Analizador OpenAI
      */
-    static createOpenAIOnly(apiKey) {
-        if (!apiKey) {
-            throw new Error('API key de OpenAI requerida');
-        }
-        console.log('📦 EmailAnalyzerFactory: Creado analizador OpenAI únicamente');
+    static createOpenAIOnly(apiKey = null) {
+        // apiKey ya no es necesaria (se usa Edge Function segura)
+        console.log('📦 EmailAnalyzerFactory: Creado analizador OpenAI únicamente (usando Edge Function)');
         return new OpenAIEmailAnalyzer(apiKey);
     }
 

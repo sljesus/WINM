@@ -1,0 +1,255 @@
+/**
+ * Edge Function: Proxy seguro para análisis de emails con OpenAI
+ * WINM - What I Need Most
+ * 
+ * Esta función actúa como proxy entre el frontend y OpenAI API,
+ * manteniendo la API key segura en el servidor (Edge Function)
+ */
+
+import "jsr:@supabase/functions-js/edge-runtime.d.ts"
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+
+// Obtener API key de OpenAI desde secrets (configurado en Supabase Dashboard)
+const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY')
+const OPENAI_MODEL = Deno.env.get('OPENAI_MODEL') || 'gpt-3.5-turbo'
+
+interface EmailContent {
+  id: string
+  subject: string
+  body: string
+  from: string
+  date: string
+}
+
+interface AnalysisRequest {
+  emailContent: EmailContent
+  categories?: Array<{ id: string; name: string }>
+}
+
+Deno.serve(async (req) => {
+  try {
+    // Validar método
+    if (req.method !== 'POST') {
+      return new Response(
+        JSON.stringify({ error: 'Método no permitido. Use POST.' }),
+        { 
+          status: 405, 
+          headers: { 'Content-Type': 'application/json' } 
+        }
+      )
+    }
+
+    // Validar API key de OpenAI
+    if (!OPENAI_API_KEY) {
+      console.error('❌ OPENAI_API_KEY no configurada en secrets')
+      return new Response(
+        JSON.stringify({ 
+          error: 'OpenAI API key no configurada. Contacte al administrador.' 
+        }),
+        { 
+          status: 500, 
+          headers: { 'Content-Type': 'application/json' } 
+        }
+      )
+    }
+
+    // Obtener datos del request
+    const { emailContent, categories }: AnalysisRequest = await req.json()
+
+    if (!emailContent || !emailContent.subject || !emailContent.body) {
+      return new Response(
+        JSON.stringify({ error: 'emailContent con subject y body es requerido' }),
+        { 
+          status: 400, 
+          headers: { 'Content-Type': 'application/json' } 
+        }
+      )
+    }
+
+    console.log(`📧 Analizando email: ${emailContent.id}`)
+
+    // Construir prompt para OpenAI
+    const prompt = buildAnalysisPrompt(emailContent, categories)
+
+    // Llamar a OpenAI API
+    const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${OPENAI_API_KEY}`
+      },
+      body: JSON.stringify({
+        model: OPENAI_MODEL,
+        messages: [
+          {
+            role: 'system',
+            content: 'Eres un experto en análisis de emails bancarios mexicanos. Extrae información precisa de transacciones financieras. Responde únicamente con JSON válido sin markdown.'
+          },
+          {
+            role: 'user',
+            content: prompt
+          }
+        ],
+        temperature: 0.1, // Baja temperatura para respuestas consistentes
+        max_tokens: 300
+      })
+    })
+
+    if (!openaiResponse.ok) {
+      const errorText = await openaiResponse.text()
+      console.error(`❌ Error de OpenAI API: ${openaiResponse.status}`, errorText)
+      return new Response(
+        JSON.stringify({ 
+          error: `Error al analizar email: ${openaiResponse.statusText}`,
+          details: errorText
+        }),
+        { 
+          status: openaiResponse.status, 
+          headers: { 'Content-Type': 'application/json' } 
+        }
+      )
+    }
+
+    const data = await openaiResponse.json()
+    let responseText = data.choices[0].message.content.trim()
+
+    // Limpiar respuesta (remover markdown si existe)
+    responseText = responseText.replace(/^```json\n?/i, '').replace(/\n?```$/i, '').trim()
+
+    // Parsear respuesta JSON
+    let analysisResult
+    try {
+      analysisResult = JSON.parse(responseText)
+    } catch (parseError) {
+      console.error('❌ Error parseando respuesta de OpenAI:', parseError)
+      return new Response(
+        JSON.stringify({ 
+          error: 'Error parseando respuesta de OpenAI',
+          rawResponse: responseText
+        }),
+        { 
+          status: 500, 
+          headers: { 'Content-Type': 'application/json' } 
+        }
+      )
+    }
+
+    // Validar y formatear respuesta
+    const transaction = formatTransaction(analysisResult, emailContent)
+
+    console.log(`✅ Email analizado exitosamente: ${emailContent.id}`)
+
+    return new Response(
+      JSON.stringify({
+        success: true,
+        transaction: transaction,
+        analyzer_used: 'OpenAI',
+        confidence: analysisResult.confidence || 0.8
+      }),
+      { 
+        status: 200, 
+        headers: { 
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'POST, OPTIONS',
+          'Access-Control-Allow-Headers': 'Content-Type, Authorization'
+        } 
+      }
+    )
+
+  } catch (error) {
+    console.error('❌ Error en analyze-email:', error)
+    return new Response(
+      JSON.stringify({ 
+        error: 'Error interno del servidor',
+        message: error.message 
+      }),
+      { 
+        status: 500, 
+        headers: { 'Content-Type': 'application/json' } 
+      }
+    )
+  }
+})
+
+/**
+ * Construye el prompt para OpenAI basado en el contenido del email
+ */
+function buildAnalysisPrompt(emailContent: EmailContent, categories?: Array<{ id: string; name: string }>): string {
+  const categoriesList = categories 
+    ? categories.map(c => `- ${c.name}`).join('\n')
+    : 'Categorías disponibles se determinarán automáticamente'
+
+  return `Analiza el siguiente email bancario y extrae la información de la transacción en formato JSON.
+
+Email:
+Asunto: ${emailContent.subject}
+De: ${emailContent.from}
+Fecha: ${emailContent.date}
+Contenido: ${emailContent.body.substring(0, 2000)}
+
+Categorías disponibles:
+${categoriesList}
+
+Responde ÚNICAMENTE con un JSON válido con esta estructura:
+{
+  "amount": número (positivo para ingresos, negativo para gastos),
+  "description": "descripción clara y concisa",
+  "date": "YYYY-MM-DD",
+  "transaction_type": "compra|transferencia|ingreso|retiro|pago",
+  "category": "nombre de categoría más apropiada",
+  "confidence": número entre 0 y 1
+}
+
+Si no puedes extraer información válida, responde con: {"error": "No se pudo extraer información"}`
+}
+
+/**
+ * Formatea la respuesta de OpenAI en el formato esperado por el frontend
+ */
+function formatTransaction(analysisResult: any, emailContent: EmailContent): any {
+  // Si hay error en el análisis, retornar null
+  if (analysisResult.error) {
+    return null
+  }
+
+  // Validar campos requeridos
+  if (!analysisResult.amount || !analysisResult.description) {
+    return null
+  }
+
+  // Determinar si es gasto o ingreso
+  const amount = parseFloat(analysisResult.amount)
+  const isExpense = amount < 0 || 
+                    analysisResult.transaction_type?.toLowerCase().includes('compra') ||
+                    analysisResult.transaction_type?.toLowerCase().includes('gasto') ||
+                    analysisResult.transaction_type?.toLowerCase().includes('pago')
+
+  // Formatear fecha
+  let transactionDate = emailContent.date
+  if (analysisResult.date) {
+    try {
+      // Intentar parsear fecha de OpenAI
+      const parsedDate = new Date(analysisResult.date)
+      if (!isNaN(parsedDate.getTime())) {
+        transactionDate = parsedDate.toISOString().split('T')[0]
+      }
+    } catch (e) {
+      // Usar fecha del email si falla
+    }
+  }
+
+  return {
+    amount: isExpense ? -Math.abs(amount) : Math.abs(amount),
+    description: analysisResult.description.trim(),
+    date: transactionDate,
+    source: 'Email', // Se determinará en el frontend
+    transaction_type: analysisResult.transaction_type || 'compra',
+    email_id: emailContent.id,
+    email_subject: emailContent.subject,
+    needs_categorization: false,
+    bank: 'Email',
+    category: analysisResult.category || null,
+    confidence: analysisResult.confidence || 0.8
+  }
+}
