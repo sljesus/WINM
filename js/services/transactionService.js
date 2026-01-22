@@ -1,6 +1,6 @@
 // Servicio de Transacciones
 // Principio SOLID: Responsabilidad única - Lógica de negocio de transacciones
-// Actualizado para GitHub Pages
+// Actualizado para GitHub Pages - v2
 
 import { getSupabaseClient } from './supabaseService.js';
 import { getMonthStart, getMonthEnd } from '../utils/dateFormatter.js';
