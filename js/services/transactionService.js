@@ -304,3 +304,6 @@ export async function getSources() {
         throw error;
     }
 }
+
+// Exportación explícita adicional para asegurar compatibilidad
+export { createTransaction };
