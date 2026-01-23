@@ -243,7 +243,7 @@ class MercadoPagoEmailParser extends BaseEmailParser {
 
         // CASO ESPECIAL: "recibimos un pago en tu tarjeta de crédito" = egreso (pago de saldo)
         if (/(recibimos|recibieron)\s+(?:un\s+)?pago\s+(?:en|a|de)\s+(?:tu\s+)?(?:tarjeta\s+de\s+crédito|tarjeta|crédito)/.test(fullText)) {
-            transactionType = 'pago';
+            transactionType = 'compra'; // Usar 'compra' (valor permitido en BD) en lugar de 'pago'
             isExpense = true;
         }
         // Detectar ingresos (con variantes con/sin tildes) - pero NO si es pago de tarjeta
@@ -635,7 +635,7 @@ class NUEmailParser extends BaseEmailParser {
 
         // CASO ESPECIAL: "recibimos un pago en tu tarjeta de crédito" = egreso (pago de saldo)
         if (/(recibimos|recibieron)\s+(?:un\s+)?pago\s+(?:en|a|de)\s+(?:tu\s+)?(?:tarjeta\s+de\s+crédito|tarjeta|crédito)/.test(fullText)) {
-            transactionType = 'pago';
+            transactionType = 'compra'; // Usar 'compra' (valor permitido en BD) en lugar de 'pago'
             isExpense = true;
         }
         // Detectar ingresos (con variantes con/sin tildes) - pero NO si es pago de tarjeta
@@ -746,7 +746,7 @@ class PlataCardEmailParser extends BaseEmailParser {
 
         // CASO ESPECIAL: "recibimos un pago en tu tarjeta de crédito" = egreso (pago de saldo)
         if (/(recibimos|recibieron)\s+(?:un\s+)?pago\s+(?:en|a|de)\s+(?:tu\s+)?(?:tarjeta\s+de\s+crédito|tarjeta|crédito)/.test(fullText)) {
-            transactionType = 'pago';
+            transactionType = 'compra'; // Usar 'compra' (valor permitido en BD) en lugar de 'pago'
             isExpense = true;
         }
         // Detectar ingresos (con variantes con/sin tildes) - pero NO si es pago de tarjeta
