@@ -90,6 +90,8 @@ export async function getSession() {
 export async function signInWithGoogle() {
     try {
         const client = getSupabaseClient();
+        // Usar window.location.href sin hash/fragment para obtener la URL completa con path
+        const redirectUrl = window.location.origin + window.location.pathname;
         const { data, error } = await client.auth.signInWithOAuth({
             provider: 'google',
             options: {
@@ -98,7 +100,7 @@ export async function signInWithGoogle() {
                     access_type: 'offline',
                     prompt: 'consent'
                 },
-                redirectTo: window.location.origin
+                redirectTo: redirectUrl
             }
         });
 
