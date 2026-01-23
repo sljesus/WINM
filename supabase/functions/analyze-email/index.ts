@@ -268,7 +268,7 @@ Responde ÚNICAMENTE con un JSON válido con esta estructura:
   "amount": número (positivo para ingresos, negativo para gastos) - solo si is_transaction es true,
   "description": "descripción clara y concisa" - solo si is_transaction es true,
   "date": "YYYY-MM-DD" - solo si is_transaction es true,
-  "transaction_type": "compra|transferencia|ingreso|retiro|pago" - solo si is_transaction es true,
+  "transaction_type": "compra|transferencia|ingreso|retiro|otro" - solo si is_transaction es true (NO usar 'pago', usar 'compra' para pagos),
   "category": "nombre de categoría más apropiada" - solo si is_transaction es true,
   "confidence": número entre 0 y 1,
   "reason": "razón por la que se excluyó" - solo si is_transaction es false
@@ -385,12 +385,26 @@ function formatTransaction(analysisResult: any, emailContent: EmailContent): any
   // Identificar source válido desde el email (solo valores permitidos por BD)
   const source = identifySourceFromEmail(emailContent)
   
+  // Validar y normalizar transaction_type (solo valores permitidos por BD)
+  const allowedTypes = ['compra', 'ingreso', 'transferencia', 'retiro', 'otro']
+  let transactionType = (analysisResult.transaction_type || 'compra').toLowerCase()
+  
+  // Si OpenAI devuelve 'pago', convertir a 'compra' (valor permitido en BD)
+  if (transactionType === 'pago' || transactionType.includes('pago')) {
+    transactionType = 'compra'
+  }
+  
+  // Si no está en la lista permitida, usar 'compra' como fallback
+  if (!allowedTypes.includes(transactionType)) {
+    transactionType = 'compra'
+  }
+  
   return {
     amount: isExpense ? -Math.abs(amount) : Math.abs(amount),
     description: analysisResult.description.trim(),
     date: transactionDate,
     source: source, // Solo valores permitidos: 'Mercado Pago', 'BBVA', 'NU', 'Plata Card'
-    transaction_type: analysisResult.transaction_type || 'compra',
+    transaction_type: transactionType, // Validado: solo valores permitidos por BD
     email_id: emailContent.id,
     email_subject: emailContent.subject,
     needs_categorization: false,
