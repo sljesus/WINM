@@ -104,7 +104,8 @@ export class OpenAIEmailAnalyzer extends IEmailAnalyzer {
             const data = await apiResponse.json();
 
             if (!data.success || !data.transaction) {
-                console.warn(`⚠️ ${this.name}: Edge Function no pudo extraer transacción`);
+                // No es un error - simplemente no es una transacción válida (pago rechazado, estado de cuenta, etc.)
+                // Solo loggear en modo debug
                 return null;
             }
 

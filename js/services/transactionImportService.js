@@ -201,9 +201,8 @@ class TransactionImportService {
                     transactions.push(transaction);
                     const analyzerInfo = transaction.analyzer_used ? ` (${transaction.analyzer_used})` : '';
                     this.reportProgress(`Transacción extraída${analyzerInfo}: ${transaction.description} - $${Math.abs(transaction.amount).toFixed(2)}`);
-                } else {
-                    this.reportProgress(`No se pudo extraer transacción del email ${emailInfo.id}`);
                 }
+                // No reportar cuando no se puede extraer transacción (es normal para emails no transaccionales)
 
             } catch (error) {
                 this.reportError(`Error procesando email ${emailInfo.id}`, error);

@@ -39,28 +39,19 @@ class BaseEmailParser {
             /\b(\d{1,3}(?:,\d{3})*(?:\.\d{2})?)\b/
         ];
 
-        console.log('🔍 extractAmount - Texto limpio:', cleanText.substring(0, 200));
-
+        // Logs de debug removidos - solo mostrar errores importantes
         for (const pattern of patterns) {
-            console.log('🔍 Probando patrón:', pattern);
             const match = cleanText.match(pattern);
             if (match && match[1]) {
                 // Limpiar comas y convertir
                 const cleanAmount = match[1].replace(/,/g, '');
                 const amount = parseFloat(cleanAmount);
 
-                console.log('🔍 Monto extraído del match:', match[1], '->', amount);
-
                 if (!isNaN(amount) && amount > 0) {
-                    console.log('✅ Monto válido encontrado:', amount);
                     return amount;
-                } else {
-                    console.log('❌ Monto inválido o cero:', amount);
                 }
             }
         }
-
-        console.log('❌ No se encontró monto válido en el texto');
         return null;
     }
 
@@ -279,7 +270,7 @@ class MercadoPagoEmailParser extends BaseEmailParser {
             bank: source
         };
 
-        console.log('📊 Transacción Mercado Pago creada:', {
+        // Log removido - demasiado ruido
             amount: transaction.amount,
             description: transaction.description,
             date: transaction.date,
@@ -525,7 +516,7 @@ class BBVAEmailParser extends BaseEmailParser {
             bank: source
         };
 
-        console.log('📊 Transacción BBVA creada:', {
+        // Log removido - demasiado ruido
             amount: transaction.amount,
             description: transaction.description,
             date: transaction.date,
@@ -738,7 +729,7 @@ class PlataCardEmailParser extends BaseEmailParser {
             bank: source
         };
 
-        console.log('📊 Transacción Plata Card creada:', {
+        // Log removido - demasiado ruido
             amount: transaction.amount,
             description: transaction.description,
             date: transaction.date,

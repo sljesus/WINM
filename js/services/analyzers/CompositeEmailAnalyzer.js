@@ -47,35 +47,32 @@ export class CompositeEmailAnalyzer extends IEmailAnalyzer {
      * @returns {Promise<Object|null>} Primer resultado válido o null
      */
     async analyzeEmail(emailContent) {
-        console.log(`🔄 ${this.name}: Iniciando análisis compuesto para email ${emailContent.id}`);
-        console.log(`📊 ${this.name}: ${this.analyzers.length} analizadores disponibles`);
+        // Logs de debug removidos - solo mostrar errores importantes
 
         for (let i = 0; i < this.analyzers.length; i++) {
             const analyzer = this.analyzers[i];
             const analyzerName = analyzer.name || analyzer.constructor.name;
 
             try {
-                console.log(`🔍 ${this.name}: Intentando con ${analyzerName} (${i + 1}/${this.analyzers.length})`);
-
                 const result = await analyzer.analyzeEmail(emailContent);
 
                 if (result) {
-                    console.log(`✅ ${this.name}: ${analyzerName} encontró transacción: ${result.description} - $${result.amount}`);
+                    // Solo log si es exitoso (importante para debugging)
                     // Agregar metadato del analizador compuesto
                     result.analyzer_chain = this._getAnalyzerChain(i);
                     return result;
-                } else {
-                    console.log(`❌ ${this.name}: ${analyzerName} no encontró transacción, intentando siguiente...`);
                 }
+                // No loggear cuando un analizador no encuentra transacción (es normal)
 
             } catch (error) {
-                console.warn(`⚠️ ${this.name}: ${analyzerName} falló con error:`, error);
+                // Solo loggear errores reales, no cuando simplemente no encuentra transacción
+                console.error(`❌ [ERROR] ${this.name}: ${analyzerName} falló:`, error);
                 // Continuar con el siguiente analizador
                 continue;
             }
         }
 
-        console.log(`❌ ${this.name}: Ningún analizador pudo extraer transacción del email ${emailContent.id}`);
+        // No loggear cuando ningún analizador encuentra transacción (es normal para emails no transaccionales)
         return null;
     }
 
