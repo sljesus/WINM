@@ -117,7 +117,7 @@ export class OpenAIEmailAnalyzer extends IEmailAnalyzer {
             transaction.analyzed_by_ai = true;
             transaction.analyzer_used = this.name;
 
-            console.log(`✅ ${this.name}: Transacción extraída: ${transaction.description} - $${transaction.amount}`);
+            // Log removido - se muestra en el progreso de importación
             return transaction;
 
         } catch (error) {
