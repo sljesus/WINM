@@ -42,6 +42,10 @@ export async function searchBankEmails(query, maxResults = 50, pageToken = null)
         return await response.json();
     } catch (error) {
         console.error('Error buscando emails:', error);
+        // Asegurar que el error tenga un mensaje
+        if (!error.message) {
+            error.message = error.toString();
+        }
         throw error;
     }
 }

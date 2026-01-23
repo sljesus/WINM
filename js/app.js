@@ -14,6 +14,9 @@ import {
     onAuthStateChange
 } from './services/supabaseService.js';
 
+// Importar servicio de tokens de Gmail
+import { hasGmailAccess } from './services/gmailTokenService.js';
+
 // Importar servicios de transacciones
 import {
     loadTransactions,
@@ -405,6 +408,18 @@ async function handleManualImport() {
             return;
         }
 
+        // Verificar token de Gmail antes de iniciar
+        const hasAccess = await hasGmailAccess();
+        if (!hasAccess) {
+            const shouldReauth = confirm(
+                '🔐 No tienes acceso a Gmail. Necesitas iniciar sesión con Google para importar transacciones.\n\n¿Deseas iniciar sesión ahora?'
+            );
+            if (shouldReauth) {
+                handleGoogleSignIn();
+            }
+            return;
+        }
+
         // Cambiar texto del botón para mostrar progreso
         importBtn.innerHTML = '<span style="margin-right: 0.5rem;">⏳</span>Importando...';
         importBtn.disabled = true;
@@ -426,7 +441,19 @@ async function handleManualImport() {
             (error) => {
                 // Callback de error
                 console.error('❌ Error en importación manual:', error);
-                alert(`Error al importar transacciones: ${error.message || 'Error desconocido'}`);
+                const errorMessage = error.message || error.toString() || 'Error desconocido';
+                
+                // Si el error es por falta de token de Gmail, ofrecer re-autenticarse
+                if (errorMessage.includes('token de Gmail') || errorMessage.includes('Token de Gmail') || errorMessage.includes('inicia sesión')) {
+                    const shouldReauth = confirm(
+                        `🔐 ${errorMessage}\n\n¿Deseas iniciar sesión nuevamente con Google para obtener acceso a Gmail?`
+                    );
+                    if (shouldReauth) {
+                        handleGoogleSignIn();
+                    }
+                } else {
+                    alert(`Error al importar transacciones: ${errorMessage}`);
+                }
             }
         );
 
