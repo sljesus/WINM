@@ -33,10 +33,10 @@ export class RegexEmailAnalyzer extends IEmailAnalyzer {
                 transaction.analyzed_by_ai = false;
                 transaction.analyzer_used = this.name;
 
-                console.log(`✅ ${this.name}: Transacción extraída: ${transaction.description} - $${transaction.amount}`);
+                // Log removido - se muestra en el progreso de importación
                 return transaction;
             } else {
-                console.log(`❌ ${this.name}: No se pudo extraer transacción del email ${emailContent.id}`);
+                // No loggear cuando no se encuentra transacción (es normal)
                 return null;
             }
 
