@@ -250,10 +250,10 @@ class TransactionImportService {
 
             const { data, error } = await client
                 .from('transactions')
-                .select('id, email_id')
+                .select('id, email_id', { count: 'exact' })
                 .eq('user_id', user.id)
                 .eq('email_id', emailId)
-                .single();
+                .maybeSingle(); // Usar maybeSingle en lugar de single para evitar 406
 
             if (error) {
                 // Si no encuentra la transacción, error.code será 'PGRST116'

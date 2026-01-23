@@ -27,6 +27,19 @@ interface AnalysisRequest {
 }
 
 Deno.serve(async (req) => {
+  // Manejar preflight CORS (OPTIONS)
+  if (req.method === 'OPTIONS') {
+    return new Response(null, {
+      status: 204,
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'POST, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+        'Access-Control-Max-Age': '86400'
+      }
+    })
+  }
+
   try {
     // Validar método
     if (req.method !== 'POST') {
@@ -34,7 +47,10 @@ Deno.serve(async (req) => {
         JSON.stringify({ error: 'Método no permitido. Use POST.' }),
         { 
           status: 405, 
-          headers: { 'Content-Type': 'application/json' } 
+          headers: { 
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*'
+          } 
         }
       )
     }
@@ -48,7 +64,10 @@ Deno.serve(async (req) => {
         }),
         { 
           status: 500, 
-          headers: { 'Content-Type': 'application/json' } 
+          headers: { 
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*'
+          } 
         }
       )
     }
@@ -61,7 +80,10 @@ Deno.serve(async (req) => {
         JSON.stringify({ error: 'emailContent con subject y body es requerido' }),
         { 
           status: 400, 
-          headers: { 'Content-Type': 'application/json' } 
+          headers: { 
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*'
+          } 
         }
       )
     }
@@ -105,7 +127,10 @@ Deno.serve(async (req) => {
         }),
         { 
           status: openaiResponse.status, 
-          headers: { 'Content-Type': 'application/json' } 
+          headers: { 
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*'
+          } 
         }
       )
     }
@@ -129,7 +154,10 @@ Deno.serve(async (req) => {
         }),
         { 
           status: 500, 
-          headers: { 'Content-Type': 'application/json' } 
+          headers: { 
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*'
+          } 
         }
       )
     }
@@ -166,7 +194,10 @@ Deno.serve(async (req) => {
       }),
       { 
         status: 500, 
-        headers: { 'Content-Type': 'application/json' } 
+        headers: { 
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*'
+        } 
       }
     )
   }
