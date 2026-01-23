@@ -252,6 +252,36 @@ Si es una transacción válida, responde con is_transaction: true y los demás c
 }
 
 /**
+ * Identifica la fuente desde el contenido del email
+ * Retorna solo valores permitidos por la BD: 'Mercado Pago', 'BBVA', 'NU', 'Plata Card'
+ */
+function identifySourceFromEmail(emailContent: EmailContent): string {
+  const from = (emailContent.from || '').toLowerCase()
+  const subject = (emailContent.subject || '').toLowerCase()
+  const body = (emailContent.body || '').toLowerCase()
+  const text = `${from} ${subject} ${body}`
+
+  const sources = {
+    'mercado pago': 'Mercado Pago',
+    'mercadopago': 'Mercado Pago',
+    'mercadolibre': 'Mercado Pago', // Mercado Libre usa Mercado Pago
+    'bbva': 'BBVA',
+    'nu': 'NU',
+    'plata card': 'Plata Card',
+    'plata': 'Plata Card'
+  }
+
+  for (const [key, value] of Object.entries(sources)) {
+    if (text.includes(key)) {
+      return value
+    }
+  }
+
+  // Fallback: Mercado Pago es el más común
+  return 'Mercado Pago'
+}
+
+/**
  * Formatea la respuesta de OpenAI en el formato esperado por el frontend
  */
 function formatTransaction(analysisResult: any, emailContent: EmailContent): any {
@@ -318,16 +348,19 @@ function formatTransaction(analysisResult: any, emailContent: EmailContent): any
     }
   }
 
+  // Identificar source válido desde el email (solo valores permitidos por BD)
+  const source = identifySourceFromEmail(emailContent)
+  
   return {
     amount: isExpense ? -Math.abs(amount) : Math.abs(amount),
     description: analysisResult.description.trim(),
     date: transactionDate,
-    source: 'Email', // Se determinará en el frontend
+    source: source, // Solo valores permitidos: 'Mercado Pago', 'BBVA', 'NU', 'Plata Card'
     transaction_type: analysisResult.transaction_type || 'compra',
     email_id: emailContent.id,
     email_subject: emailContent.subject,
     needs_categorization: false,
-    bank: 'Email',
+    bank: source, // Usar mismo valor que source
     category: analysisResult.category || null,
     confidence: analysisResult.confidence || 0.8
   }

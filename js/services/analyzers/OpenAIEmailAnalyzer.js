@@ -274,10 +274,11 @@ Cuerpo: ${body.substring(0, 800)}...
         const sources = {
             'mercado pago': 'Mercado Pago',
             'mercadopago': 'Mercado Pago',
+            'mercadolibre': 'Mercado Pago', // Mercado Libre usa Mercado Pago
             'bbva': 'BBVA',
             'nu': 'NU',
             'plata card': 'Plata Card',
-            'mercadolibre': 'Mercado Libre'
+            'plata': 'Plata Card'
         };
 
         for (const [key, value] of Object.entries(sources)) {
@@ -286,7 +287,8 @@ Cuerpo: ${body.substring(0, 800)}...
             }
         }
 
-        return 'Desconocido';
+        // Fallback: Mercado Pago es el más común (nunca retornar 'Desconocido')
+        return 'Mercado Pago';
     }
 
     /**
