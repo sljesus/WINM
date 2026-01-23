@@ -294,14 +294,26 @@ class MercadoPagoEmailParser extends BaseEmailParser {
         const body = (emailContent.body || '').toLowerCase();
         const text = `${subject} ${body}`;
 
-        // Palabras clave de transacción
-        const transactionKeywords = ['compra', 'pago', 'recibiste', 'pagaste', 'transacción'];
-        const excludeKeywords = ['promoción', 'oferta', 'publicidad', 'newsletter', 'sorteo'];
+        // Excluir pagos rechazados, intentos fallidos, etc. (no son transacciones reales)
+        const excludeKeywords = [
+            'promoción', 'oferta', 'publicidad', 'newsletter', 'sorteo',
+            'pago rechazado', 'rechazado', 'rechazada', 'intento fallido',
+            'no se pudo', 'no se completó', 'falló', 'fallido', 'error en el pago',
+            'pago no procesado', 'transacción cancelada', 'cancelado', 'cancelada'
+        ];
 
-        const hasTransaction = transactionKeywords.some(keyword => text.includes(keyword));
+        // Verificar exclusiones primero
         const hasExclusion = excludeKeywords.some(keyword => text.includes(keyword));
+        if (hasExclusion) {
+            console.log('🚫 Email excluido (pago rechazado o intento fallido):', subject.substring(0, 50));
+            return false;
+        }
 
-        return hasTransaction && !hasExclusion;
+        // Palabras clave de transacción válida
+        const transactionKeywords = ['compra', 'pago', 'recibiste', 'pagaste', 'transacción'];
+        const hasTransaction = transactionKeywords.some(keyword => text.includes(keyword));
+
+        return hasTransaction;
     }
 
     extractDescription(body, subject) {
@@ -524,13 +536,24 @@ class BBVAEmailParser extends BaseEmailParser {
         const body = (emailContent.body || '').toLowerCase();
         const text = `${subject} ${body}`;
 
-        const transactionKeywords = ['cargo', 'abono', 'compra', 'retiro', 'transferencia'];
-        const excludeKeywords = ['estado de cuenta', 'promoción', 'oferta'];
+        // Excluir pagos rechazados, intentos fallidos, etc. (no son transacciones reales)
+        const excludeKeywords = [
+            'estado de cuenta', 'promoción', 'oferta',
+            'pago rechazado', 'rechazado', 'rechazada', 'intento fallido',
+            'no se pudo', 'no se completó', 'falló', 'fallido', 'error en el pago',
+            'pago no procesado', 'transacción cancelada', 'cancelado', 'cancelada'
+        ];
 
-        const hasTransaction = transactionKeywords.some(keyword => text.includes(keyword));
         const hasExclusion = excludeKeywords.some(keyword => text.includes(keyword));
+        if (hasExclusion) {
+            console.log('🚫 Email excluido (pago rechazado o intento fallido):', subject.substring(0, 50));
+            return false;
+        }
 
-        return hasTransaction && !hasExclusion;
+        const transactionKeywords = ['cargo', 'abono', 'compra', 'retiro', 'transferencia'];
+        const hasTransaction = transactionKeywords.some(keyword => text.includes(keyword));
+
+        return hasTransaction;
     }
 
     extractDescription(body, subject) {
@@ -615,13 +638,24 @@ class NUEmailParser extends BaseEmailParser {
         const body = (emailContent.body || '').toLowerCase();
         const text = `${subject} ${body}`;
 
-        const transactionKeywords = ['compra', 'pago', 'cargo', 'recibiste', 'transacción'];
-        const excludeKeywords = ['promoción', 'oferta', 'publicidad', 'newsletter', 'invitación'];
+        // Excluir pagos rechazados, intentos fallidos, etc. (no son transacciones reales)
+        const excludeKeywords = [
+            'promoción', 'oferta', 'publicidad', 'newsletter', 'invitación',
+            'pago rechazado', 'rechazado', 'rechazada', 'intento fallido',
+            'no se pudo', 'no se completó', 'falló', 'fallido', 'error en el pago',
+            'pago no procesado', 'transacción cancelada', 'cancelado', 'cancelada'
+        ];
 
-        const hasTransaction = transactionKeywords.some(keyword => text.includes(keyword));
         const hasExclusion = excludeKeywords.some(keyword => text.includes(keyword));
+        if (hasExclusion) {
+            console.log('🚫 Email excluido (pago rechazado o intento fallido):', subject.substring(0, 50));
+            return false;
+        }
 
-        return hasTransaction && !hasExclusion;
+        const transactionKeywords = ['compra', 'pago', 'cargo', 'recibiste', 'transacción'];
+        const hasTransaction = transactionKeywords.some(keyword => text.includes(keyword));
+
+        return hasTransaction;
     }
 
     extractDescription(body, subject) {
