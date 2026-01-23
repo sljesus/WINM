@@ -402,7 +402,5 @@ export async function deleteInvalidTransactions() {
 
 // Exportar createTransaction al final (las demás ya tienen export inline)
 export { 
-    createTransaction,
-    deleteTransaction,
-    deleteInvalidTransactions
+    createTransaction
 };
