@@ -86,7 +86,13 @@ export async function getEmailContent(messageId) {
         const dateStr = headers.find(h => h.name === 'Date')?.value || '';
 
         // Extraer cuerpo del mensaje
-        const body = extractBody(message.payload);
+        let body = extractBody(message.payload);
+        
+        // Si el body está vacío, usar snippet como fallback
+        if (!body || body.trim() === '') {
+            body = message.snippet || '';
+            console.warn(`⚠️ Email ${messageId} sin body extraído, usando snippet`);
+        }
 
         return {
             id: messageId,

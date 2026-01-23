@@ -191,19 +191,30 @@ class TransactionImportService {
 
         for (const emailInfo of emailIds) {
             try {
-                const emailContent = await getEmailContent(emailInfo.id);
-                if (!emailContent?.body) {
-                    this.reportProgress(`Email ${emailInfo.id} sin contenido, omitiendo`);
+                // Verificar duplicados ANTES de analizar (usar email_id del email, no de la transacción)
+                if (skipDuplicates && (await existsByEmailId(emailInfo.id))) {
+                    this.reportProgress(`Email ${emailInfo.id} ya procesado, omitiendo`);
                     continue;
+                }
+
+                const emailContent = await getEmailContent(emailInfo.id);
+                
+                // Si no hay body, usar snippet como fallback
+                if (!emailContent?.body || emailContent.body.trim() === '') {
+                    if (emailContent?.snippet) {
+                        emailContent.body = emailContent.snippet;
+                        this.reportProgress(`Email ${emailInfo.id} sin body, usando snippet`);
+                    } else {
+                        this.reportProgress(`Email ${emailInfo.id} sin contenido, omitiendo`);
+                        continue;
+                    }
                 }
 
                 const transaction = await this.emailAnalyzer.analyzeEmail(emailContent, { categories });
 
                 if (transaction) {
-                    if (skipDuplicates && (await existsByEmailId(transaction.email_id))) {
-                        this.reportProgress(`Transacción duplicada omitida: ${transaction.description}`);
-                        continue;
-                    }
+                    // Asegurar que email_id sea el del email original (no el que pudo haber cambiado el analizador)
+                    transaction.email_id = emailInfo.id;
                     transactions.push(transaction);
                     const analyzerInfo = transaction.analyzer_used ? ` (${transaction.analyzer_used})` : '';
                     this.reportProgress(`Transacción extraída${analyzerInfo}: ${transaction.description} - $${Math.abs(transaction.amount).toFixed(2)}`);

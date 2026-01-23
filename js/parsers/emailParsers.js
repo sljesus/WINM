@@ -26,29 +26,38 @@ class BaseEmailParser {
      * @returns {number|null} Monto extraído o null
      */
     extractAmount(text) {
+        if (!text) return null;
+        
         // Limpiar texto primero
         const cleanText = this.cleanAmountText(text);
 
-        // Patrones mejorados para montos
+        // Patrones mejorados para montos (priorizar montos con contexto de transacción)
         const patterns = [
-            // Monto con símbolo de peso mexicano
-            /(?:MXN?|\$)\s*([\d,]+\.?\d*)/i,
-            // Monto con palabras
-            /([\d,]+\.?\d*)\s*(?:MXN|pesos|peso|mxn)/i,
-            // Monto solo con números (más estricto)
-            /\b(\d{1,3}(?:,\d{3})*(?:\.\d{2})?)\b/
+            // Monto con símbolo de peso mexicano (más específico: cerca de palabras clave)
+            /(?:recibiste|ingresó|pagaste|pago|monto|total|importe|cantidad|dinero)[\s:]*\$?\s*([\d,]+\.?\d{2})/i,
+            // Monto con símbolo de peso mexicano (general)
+            /\$\s*([\d,]+\.?\d{2})/,
+            // Monto con palabras de moneda
+            /([\d,]+\.?\d{2})\s*(?:MXN|pesos|peso|mxn)/i,
+            // Monto con símbolo (sin decimales estrictos)
+            /\$\s*([\d,]+\.?\d*)/,
+            // Monto solo con números (solo si tiene formato de dinero: 3+ dígitos o con decimales)
+            /\b(\d{3,}(?:,\d{3})*(?:\.\d{2})?)\b/,
+            // Monto pequeño con decimales (100.00, 140.00, etc.)
+            /\b(\d{1,3}\.\d{2})\b/
         ];
 
-        // Logs de debug removidos - solo mostrar errores importantes
         for (const pattern of patterns) {
-            const match = cleanText.match(pattern);
-            if (match && match[1]) {
-                // Limpiar comas y convertir
-                const cleanAmount = match[1].replace(/,/g, '');
-                const amount = parseFloat(cleanAmount);
-
-                if (!isNaN(amount) && amount > 0) {
-                    return amount;
+            const matches = [...cleanText.matchAll(new RegExp(pattern.source, pattern.flags + 'g'))];
+            for (const match of matches) {
+                if (match[1]) {
+                    const cleanAmount = match[1].replace(/,/g, '');
+                    const amount = parseFloat(cleanAmount);
+                    
+                    // Validar: debe ser > 0 y razonable (< 10 millones)
+                    if (!isNaN(amount) && amount > 0 && amount < 10000000) {
+                        return amount;
+                    }
                 }
             }
         }
@@ -310,48 +319,76 @@ class MercadoPagoEmailParser extends BaseEmailParser {
         const cleanSubject = this.cleanSubject(subject || '');
         const combinedText = `${cleanSubject} ${cleanBody}`.trim();
 
-        // Patrones mejorados para contenido real de transacciones
-        const patterns = [
-            // Compra específica
-            /(?:compraste|pago|pagaste)\s+(?:en|a|de)\s+([^.!?\n]{3,50})/i,
-            /(?:compra|gasto)\s+(?:en|a|de)\s+([^.!?\n]{3,50})/i,
-
-            // Transferencia/envío
-            /(?:enviaste|transferiste)\s+(?:a|para)\s+([^.!?\n]{3,50})/i,
-            /(?:recibiste|te\s+enviaron)\s+(?:de|desde)\s+([^.!?\n]{3,50})/i,
-
-            // Servicios específicos
-            /(?:servicio|suscripción)\s+(?:de|a)\s+([^.!?\n]{3,50})/i,
-            /(?:cargo|débito)\s+(?:por|de)\s+([^.!?\n]{3,50})/i,
-
-            // Concepto general
-            /concepto[:\s]*([^.!?\n]{3,50})/i,
-            /descripción[:\s]*([^.!?\n]{3,50})/i,
-
-            // Descripción general (último recurso)
-            /([A-Z][^.!?\n]{10,60}(?:compra|pago|transferencia|ingreso|gasto))/i
-        ];
-
-        for (const pattern of patterns) {
-            const match = combinedText.match(pattern);
-            if (match && match[1]) {
-                let desc = match[1].trim();
-
-                // Validar que no sea CSS o HTML
-                if (this.isValidDescription(desc)) {
-                    // Limpiar palabras comunes
-                    desc = desc.replace(/(?:mercado pago|mp|bbva|nu|plata|transferencia|banco)[:\s]*/gi, '');
-                    return this.normalizeDescription(desc);
+        // Priorizar descripciones del subject (más confiables)
+        if (cleanSubject) {
+            // Patrones específicos para subjects de Mercado Pago
+            const subjectPatterns = [
+                /(?:Ingresó|ingresó)\s+dinero\s+a\s+tu\s+cuenta/i,
+                /(?:Recibiste|recibiste)\s+dinero/i,
+                /(?:Tu\s+transferencia|transferencia)\s+fue\s+enviada/i,
+                /(?:Transferencia|transferencia)\s+recibida/i
+            ];
+            
+            for (const pattern of subjectPatterns) {
+                const match = cleanSubject.match(pattern);
+                if (match) {
+                    // Extraer la frase completa del subject
+                    const desc = match[0].trim();
+                    if (desc.length > 5 && desc.length < 100) {
+                        return desc;
+                    }
                 }
             }
         }
 
-        // Fallback con subject limpio
-        if (cleanSubject) {
-            return this.normalizeDescription(cleanSubject);
+        // Patrones mejorados para contenido real de transacciones
+        const patterns = [
+            // Ingresos específicos
+            /(?:ingresó|ingresaron|ingreso)\s+dinero\s+(?:a\s+tu\s+cuenta|en)/i,
+            /(?:recibiste|te\s+enviaron|te\s+pagaron)\s+dinero/i,
+            /(?:recibiste|recibieron)\s+\$\s*[\d,]+/i,
+            
+            // Transferencias
+            /(?:tu\s+transferencia|transferencia)\s+fue\s+enviada/i,
+            /(?:transferencia|transferiste)\s+(?:a|para)\s+([^.!?\n]{3,50})/i,
+            
+            // Compras
+            /(?:compraste|pago|pagaste)\s+(?:en|a|de)\s+([^.!?\n]{3,50})/i,
+            /(?:compra|gasto)\s+(?:en|a|de)\s+([^.!?\n]{3,50})/i,
+
+            // Concepto general
+            /concepto[:\s]*([^.!?\n]{3,50})/i,
+            /descripción[:\s]*([^.!?\n]{3,50})/i
+        ];
+
+        for (const pattern of patterns) {
+            const match = combinedText.match(pattern);
+            if (match) {
+                let desc = (match[1] || match[0]).trim();
+
+                // Validar que no sea CSS o HTML
+                if (this.isValidDescription(desc)) {
+                    // Limpiar palabras comunes pero mantener estructura
+                    desc = desc.replace(/(?:mercado pago|mp|bbva|nu|plata|banco)[:\s]*/gi, '');
+                    const normalized = this.normalizeDescription(desc);
+                    if (normalized && normalized.length > 5) {
+                        return normalized;
+                    }
+                }
+            }
         }
 
-        // Último fallback
+        // Fallback: usar subject si tiene palabras clave de transacción
+        if (cleanSubject) {
+            const subjectLower = cleanSubject.toLowerCase();
+            if (subjectLower.includes('ingresó') || subjectLower.includes('recibiste') || 
+                subjectLower.includes('transferencia') || subjectLower.includes('pago') ||
+                subjectLower.includes('compra')) {
+                return this.normalizeDescription(cleanSubject);
+            }
+        }
+
+        // Último fallback genérico
         return this.normalizeDescription('Transacción procesada');
     }
 
