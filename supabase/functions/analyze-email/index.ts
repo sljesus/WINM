@@ -186,7 +186,12 @@ IMPORTANTE: EXCLUYE los siguientes casos (NO son transacciones válidas):
 - Pagos rechazados, intentos fallidos, transacciones canceladas
 - Notificaciones de error, fallos en el procesamiento
 - Promociones, ofertas, publicidad, newsletters
-- Estados de cuenta, resúmenes (solo notificaciones de transacciones individuales)
+- Estados de cuenta, resúmenes mensuales, extractos bancarios
+- Información de límites de crédito disponibles (ej: "tu límite es de $X")
+- Notificaciones informativas que no representan movimientos reales de dinero
+- Invitaciones a descargar estados de cuenta
+- Información sobre saldos disponibles, límites, o capacidades de crédito
+- Solo incluye notificaciones de transacciones INDIVIDUALES que realmente se completaron
 
 Email:
 Asunto: ${emailContent.subject}
