@@ -244,6 +244,9 @@ IMPORTANTE: EXCLUYE los siguientes casos (NO son transacciones válidas):
 - Notificaciones informativas que no representan movimientos reales de dinero
 - Invitaciones a descargar estados de cuenta
 - Información sobre saldos disponibles, límites, o capacidades de crédito
+- Reportes de integración, métricas de desempeño, análisis técnicos (ej: "Medimos el desempeño de tu integración")
+- Informes de API, webhooks, endpoints, o métricas de desarrollador
+- Cualquier correo que mencione "integración", "desempeño", "métrica", "reporte técnico", "análisis de API"
 - Solo incluye notificaciones de transacciones INDIVIDUALES que realmente se completaron
 
 Email:
@@ -327,7 +330,7 @@ function formatTransaction(analysisResult: any, emailContent: EmailContent): any
     const body = (emailContent.body || '').toLowerCase()
     const fullText = `${subject} ${body} ${description}`.toLowerCase()
     
-    // Detectar pagos rechazados, intentos fallidos, estados de cuenta, límites, etc.
+    // Detectar pagos rechazados, intentos fallidos, estados de cuenta, límites, reportes técnicos, etc.
     const rejectionKeywords = [
       'pago rechazado', 'rechazado', 'rechazada', 'intento fallido',
       'no se pudo', 'no se completó', 'falló', 'fallido', 'error en el pago',
@@ -335,7 +338,12 @@ function formatTransaction(analysisResult: any, emailContent: EmailContent): any
       'estado de cuenta', 'descargar tu estado', 'descarga tu estado',
       'tu límite es', 'límite disponible', 'límite de crédito',
       'resumen mensual', 'extracto bancario', 'resumen de cuenta',
-      'ya puedes descargar', 'descarga tu resumen'
+      'ya puedes descargar', 'descarga tu resumen',
+      // Reportes, métricas e informes técnicos (no son transacciones)
+      'integración', 'integraciones', 'desempeño', 'medimos', 'métrica', 'métricas',
+      'reporte', 'reportes', 'análisis', 'estadística', 'estadísticas',
+      'dashboard', 'monitoreo', 'seguimiento', 'rendimiento', 'performance',
+      'api', 'endpoint', 'webhook', 'desarrollador', 'developer'
     ]
     
     if (rejectionKeywords.some(keyword => fullText.includes(keyword))) {
