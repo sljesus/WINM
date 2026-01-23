@@ -633,8 +633,14 @@ class NUEmailParser extends BaseEmailParser {
         let transactionType = 'compra';
         let isExpense = true;
 
-        // Detectar ingresos (con variantes con/sin tildes)
-        if (/(recibiste|ingreso|ingresó|ingresaron|abono|abonó|deposito|depósito|te pagaron)/.test(fullText)) {
+        // CASO ESPECIAL: "recibimos un pago en tu tarjeta de crédito" = egreso (pago de saldo)
+        if (/(recibimos|recibieron)\s+(?:un\s+)?pago\s+(?:en|a|de)\s+(?:tu\s+)?(?:tarjeta\s+de\s+crédito|tarjeta|crédito)/.test(fullText)) {
+            transactionType = 'pago';
+            isExpense = true;
+        }
+        // Detectar ingresos (con variantes con/sin tildes) - pero NO si es pago de tarjeta
+        else if (/(recibiste|ingreso|ingresó|ingresaron|abono|abonó|deposito|depósito|te pagaron)/.test(fullText) && 
+                 !/(?:pago|pagaste|pagos)\s+(?:en|a|de)\s+(?:tu\s+)?(?:tarjeta|crédito)/.test(fullText)) {
             transactionType = 'ingreso';
             isExpense = false;
         } else if (/(compra|cargo|cargan|pago|pagaste|gasto|gastaste)/.test(fullText)) {
@@ -738,8 +744,14 @@ class PlataCardEmailParser extends BaseEmailParser {
         let transactionType = 'compra';
         let isExpense = true;
 
-        // Detectar ingresos (con variantes con/sin tildes)
-        if (/(recibiste|ingreso|ingresó|ingresaron|abono|abonó|deposito|depósito|te pagaron)/.test(fullText)) {
+        // CASO ESPECIAL: "recibimos un pago en tu tarjeta de crédito" = egreso (pago de saldo)
+        if (/(recibimos|recibieron)\s+(?:un\s+)?pago\s+(?:en|a|de)\s+(?:tu\s+)?(?:tarjeta\s+de\s+crédito|tarjeta|crédito)/.test(fullText)) {
+            transactionType = 'pago';
+            isExpense = true;
+        }
+        // Detectar ingresos (con variantes con/sin tildes) - pero NO si es pago de tarjeta
+        else if (/(recibiste|ingreso|ingresó|ingresaron|abono|abonó|deposito|depósito|te pagaron)/.test(fullText) && 
+                 !/(?:pago|pagaste|pagos)\s+(?:en|a|de)\s+(?:tu\s+)?(?:tarjeta|crédito)/.test(fullText)) {
             transactionType = 'ingreso';
             isExpense = false;
         } else if (/(compra|cargo|cargan|pago|pagaste|gasto|gastaste)/.test(fullText)) {
