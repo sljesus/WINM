@@ -568,7 +568,12 @@ class BBVAEmailParser extends BaseEmailParser {
             'estado de cuenta', 'descargar tu estado', 'descarga tu estado',
             'tu límite es', 'límite disponible', 'límite de crédito',
             'resumen mensual', 'extracto bancario', 'resumen de cuenta',
-            'ya puedes descargar', 'descarga tu resumen'
+            'ya puedes descargar', 'descarga tu resumen',
+            // Reportes, métricas e informes técnicos (no son transacciones)
+            'integración', 'integraciones', 'desempeño', 'medimos', 'métrica', 'métricas',
+            'reporte', 'reportes', 'análisis', 'estadística', 'estadísticas',
+            'dashboard', 'monitoreo', 'seguimiento', 'rendimiento', 'performance',
+            'api', 'endpoint', 'webhook', 'desarrollador', 'developer'
         ];
 
         const hasExclusion = excludeKeywords.some(keyword => text.includes(keyword));
@@ -667,7 +672,12 @@ class NUEmailParser extends BaseEmailParser {
             'estado de cuenta', 'descargar tu estado', 'descarga tu estado',
             'tu límite es', 'límite disponible', 'límite de crédito',
             'resumen mensual', 'extracto bancario', 'resumen de cuenta',
-            'ya puedes descargar', 'descarga tu resumen'
+            'ya puedes descargar', 'descarga tu resumen',
+            // Reportes, métricas e informes técnicos (no son transacciones)
+            'integración', 'integraciones', 'desempeño', 'medimos', 'métrica', 'métricas',
+            'reporte', 'reportes', 'análisis', 'estadística', 'estadísticas',
+            'dashboard', 'monitoreo', 'seguimiento', 'rendimiento', 'performance',
+            'api', 'endpoint', 'webhook', 'desarrollador', 'developer'
         ];
 
         const hasExclusion = excludeKeywords.some(keyword => text.includes(keyword));
@@ -767,7 +777,12 @@ class PlataCardEmailParser extends BaseEmailParser {
             'estado de cuenta', 'descargar tu estado', 'descarga tu estado',
             'tu límite es', 'límite disponible', 'límite de crédito',
             'resumen mensual', 'extracto bancario', 'resumen de cuenta',
-            'ya puedes descargar', 'descarga tu resumen'
+            'ya puedes descargar', 'descarga tu resumen',
+            // Reportes, métricas e informes técnicos (no son transacciones)
+            'integración', 'integraciones', 'desempeño', 'medimos', 'métrica', 'métricas',
+            'reporte', 'reportes', 'análisis', 'estadística', 'estadísticas',
+            'dashboard', 'monitoreo', 'seguimiento', 'rendimiento', 'performance',
+            'api', 'endpoint', 'webhook', 'desarrollador', 'developer'
         ];
 
         const hasExclusion = excludeKeywords.some(keyword => text.includes(keyword));
