@@ -241,10 +241,11 @@ class MercadoPagoEmailParser extends BaseEmailParser {
         let transactionType = 'compra';
         let isExpense = true;
 
-        if (/(recibiste|ingreso|te pagaron)/.test(fullText)) {
+        // Detectar ingresos (con variantes con/sin tildes)
+        if (/(recibiste|ingreso|ingresó|ingresaron|te pagaron|abono|abonó|deposito|depósito)/.test(fullText)) {
             transactionType = 'ingreso';
             isExpense = false;
-        } else if (/(compra|pago|pagaste)/.test(fullText)) {
+        } else if (/(compra|pago|pagaste|gasto|gastaste|cargo|cargan)/.test(fullText)) {
             transactionType = 'compra';
             isExpense = true;
         }
@@ -571,10 +572,11 @@ class NUEmailParser extends BaseEmailParser {
         let transactionType = 'compra';
         let isExpense = true;
 
-        if (/(recibiste|ingreso|abono)/.test(fullText)) {
+        // Detectar ingresos (con variantes con/sin tildes)
+        if (/(recibiste|ingreso|ingresó|ingresaron|abono|abonó|deposito|depósito|te pagaron)/.test(fullText)) {
             transactionType = 'ingreso';
             isExpense = false;
-        } else if (/(compra|cargo|pago|pagaste)/.test(fullText)) {
+        } else if (/(compra|cargo|cargan|pago|pagaste|gasto|gastaste)/.test(fullText)) {
             transactionType = 'compra';
             isExpense = true;
         }
@@ -662,10 +664,11 @@ class PlataCardEmailParser extends BaseEmailParser {
         let transactionType = 'compra';
         let isExpense = true;
 
-        if (/(recibiste|ingreso|abono)/.test(fullText)) {
+        // Detectar ingresos (con variantes con/sin tildes)
+        if (/(recibiste|ingreso|ingresó|ingresaron|abono|abonó|deposito|depósito|te pagaron)/.test(fullText)) {
             transactionType = 'ingreso';
             isExpense = false;
-        } else if (/(compra|cargo|pago|pagaste)/.test(fullText)) {
+        } else if (/(compra|cargo|cargan|pago|pagaste|gasto|gastaste)/.test(fullText)) {
             transactionType = 'compra';
             isExpense = true;
         }

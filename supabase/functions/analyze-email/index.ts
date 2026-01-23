@@ -180,7 +180,13 @@ function buildAnalysisPrompt(emailContent: EmailContent, categories?: Array<{ id
     ? categories.map(c => `- ${c.name}`).join('\n')
     : 'Categorías disponibles se determinarán automáticamente'
 
-  return `Analiza el siguiente email bancario y extrae la información de la transacción en formato JSON.
+  return `Analiza el siguiente email bancario y determina si es una transacción financiera VÁLIDA (que realmente afectó el balance de la cuenta).
+
+IMPORTANTE: EXCLUYE los siguientes casos (NO son transacciones válidas):
+- Pagos rechazados, intentos fallidos, transacciones canceladas
+- Notificaciones de error, fallos en el procesamiento
+- Promociones, ofertas, publicidad, newsletters
+- Estados de cuenta, resúmenes (solo notificaciones de transacciones individuales)
 
 Email:
 Asunto: ${emailContent.subject}
@@ -193,15 +199,20 @@ ${categoriesList}
 
 Responde ÚNICAMENTE con un JSON válido con esta estructura:
 {
-  "amount": número (positivo para ingresos, negativo para gastos),
-  "description": "descripción clara y concisa",
-  "date": "YYYY-MM-DD",
-  "transaction_type": "compra|transferencia|ingreso|retiro|pago",
-  "category": "nombre de categoría más apropiada",
-  "confidence": número entre 0 y 1
+  "is_transaction": boolean (true solo si es una transacción válida que afectó el balance),
+  "amount": número (positivo para ingresos, negativo para gastos) - solo si is_transaction es true,
+  "description": "descripción clara y concisa" - solo si is_transaction es true,
+  "date": "YYYY-MM-DD" - solo si is_transaction es true,
+  "transaction_type": "compra|transferencia|ingreso|retiro|pago" - solo si is_transaction es true,
+  "category": "nombre de categoría más apropiada" - solo si is_transaction es true,
+  "confidence": número entre 0 y 1,
+  "reason": "razón por la que se excluyó" - solo si is_transaction es false
 }
 
-Si no puedes extraer información válida, responde con: {"error": "No se pudo extraer información"}`
+Si NO es una transacción válida (pago rechazado, intento fallido, etc.), responde con:
+{"is_transaction": false, "reason": "Pago rechazado/Intento fallido/No es transacción válida"}
+
+Si es una transacción válida, responde con is_transaction: true y los demás campos.`
 }
 
 /**
@@ -210,7 +221,35 @@ Si no puedes extraer información válida, responde con: {"error": "No se pudo e
 function formatTransaction(analysisResult: any, emailContent: EmailContent): any {
   // Si hay error en el análisis, retornar null
   if (analysisResult.error) {
+    console.log(`🚫 Email excluido por error en análisis: ${analysisResult.error}`)
     return null
+  }
+
+  // Si la IA determinó que NO es una transacción válida, retornar null
+  if (analysisResult.is_transaction === false) {
+    console.log(`🚫 Email excluido por IA (no es transacción válida): ${analysisResult.reason || 'Razón no especificada'}`)
+    return null
+  }
+
+  // Si is_transaction no está definido pero hay campos, asumir que es transacción (backward compatibility)
+  // Pero validar que no sea un pago rechazado por descripción
+  if (analysisResult.is_transaction === undefined) {
+    const description = (analysisResult.description || '').toLowerCase()
+    const subject = (emailContent.subject || '').toLowerCase()
+    const body = (emailContent.body || '').toLowerCase()
+    const fullText = `${subject} ${body} ${description}`.toLowerCase()
+    
+    // Detectar pagos rechazados o intentos fallidos
+    const rejectionKeywords = [
+      'pago rechazado', 'rechazado', 'rechazada', 'intento fallido',
+      'no se pudo', 'no se completó', 'falló', 'fallido', 'error en el pago',
+      'pago no procesado', 'transacción cancelada', 'cancelado', 'cancelada'
+    ]
+    
+    if (rejectionKeywords.some(keyword => fullText.includes(keyword))) {
+      console.log(`🚫 Email excluido (pago rechazado detectado en texto): ${emailContent.subject.substring(0, 50)}`)
+      return null
+    }
   }
 
   // Validar campos requeridos
