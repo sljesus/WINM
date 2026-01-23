@@ -99,10 +99,15 @@
                         <input type="text" id="search-input" placeholder="Buscar por descripción...">
                     </div>
                     <div class="import-container" style="margin-bottom: 1rem;">
-                        <button id="import-transactions-btn" class="btn btn-primary">
-                            <span style="margin-right: 0.5rem;">📧</span>
-                            Importar Transacciones desde Gmail
-                        </button>
+                        <div style="display: flex; gap: 10px; margin-bottom: 0.5rem; flex-wrap: wrap;">
+                            <button id="import-transactions-btn" class="btn btn-primary">
+                                <span style="margin-right: 0.5rem;">📧</span>
+                                Importar Transacciones desde Gmail
+                            </button>
+                            <button id="clean-invalid-transactions-btn" class="btn btn-secondary" style="background-color: #ff6b6b; color: white;">
+                                🧹 Limpiar Transacciones Inválidas
+                            </button>
+                        </div>
                         <p style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 0.5rem;">
                             Busca y importa automáticamente transacciones desde tus emails de BBVA, Mercado Pago, Mercado Libre, Nu y Plata Card.
                         </p>
