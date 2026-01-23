@@ -19,7 +19,8 @@ import {
     loadTransactions,
     calculateStats,
     searchTransactions,
-    getTransactionsByMonth
+    getTransactionsByMonth,
+    deleteInvalidTransactions
 } from './services/transactionService.js';
 
 // Importar componentes
@@ -232,6 +233,35 @@ function setupEventListeners() {
     const importTransactionsBtn = document.getElementById('import-transactions-btn');
     if (importTransactionsBtn) {
         importTransactionsBtn.addEventListener('click', handleManualImport);
+    }
+
+    // Botón para limpiar transacciones inválidas (temporal)
+    const cleanInvalidBtn = document.getElementById('clean-invalid-transactions-btn');
+    if (cleanInvalidBtn) {
+        cleanInvalidBtn.addEventListener('click', handleCleanInvalidTransactions);
+    }
+}
+
+/**
+ * Manejar limpieza de transacciones inválidas
+ */
+async function handleCleanInvalidTransactions() {
+    if (!confirm('¿Estás seguro de que quieres eliminar transacciones inválidas (estados de cuenta, límites de crédito, pagos rechazados)?')) {
+        return;
+    }
+
+    try {
+        const count = await deleteInvalidTransactions();
+        if (count > 0) {
+            alert(`✅ Se eliminaron ${count} transacciones inválidas. Recargando...`);
+            await renderTransactions();
+            await renderDashboard();
+        } else {
+            alert('✅ No se encontraron transacciones inválidas para eliminar.');
+        }
+    } catch (error) {
+        console.error('Error limpiando transacciones inválidas:', error);
+        alert('❌ Error al limpiar transacciones: ' + error.message);
     }
 }
 

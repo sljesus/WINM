@@ -305,7 +305,104 @@ export async function getSources() {
     }
 }
 
+/**
+ * Elimina una transacción
+ * @param {string} transactionId - ID de la transacción
+ * @returns {Promise<void>}
+ */
+export async function deleteTransaction(transactionId) {
+    try {
+        const client = getSupabaseClient();
+        const { data: { user } } = await client.auth.getUser();
+
+        if (!user) {
+            throw new Error('Usuario no autenticado');
+        }
+
+        const { error } = await client
+            .from('transactions')
+            .delete()
+            .eq('id', transactionId)
+            .eq('user_id', user.id);
+
+        if (error) throw error;
+    } catch (error) {
+        console.error('Error eliminando transacción:', error);
+        throw error;
+    }
+}
+
+/**
+ * Elimina transacciones que coinciden con patrones de no-transacciones válidas
+ * (estados de cuenta, límites de crédito, pagos rechazados, etc.)
+ * @returns {Promise<number>} Número de transacciones eliminadas
+ */
+export async function deleteInvalidTransactions() {
+    try {
+        const client = getSupabaseClient();
+        const { data: { user } } = await client.auth.getUser();
+
+        if (!user) {
+            throw new Error('Usuario no autenticado');
+        }
+
+        // Patrones de descripciones que indican que NO son transacciones válidas
+        const invalidPatterns = [
+            'estado de cuenta',
+            'descargar tu estado',
+            'tu límite es',
+            'límite disponible',
+            'pago rechazado',
+            'rechazado',
+            'intento fallido',
+            'no se pudo',
+            'no se completó',
+            'falló',
+            'error en el pago',
+            'transacción cancelada'
+        ];
+
+        // Buscar transacciones con estas descripciones
+        const { data: transactions, error: fetchError } = await client
+            .from('transactions')
+            .select('id, description, email_subject')
+            .eq('user_id', user.id);
+
+        if (fetchError) throw fetchError;
+
+        // Filtrar transacciones inválidas
+        const invalidIds = (transactions || [])
+            .filter(t => {
+                const text = `${t.description || ''} ${t.email_subject || ''}`.toLowerCase();
+                return invalidPatterns.some(pattern => text.includes(pattern));
+            })
+            .map(t => t.id);
+
+        if (invalidIds.length === 0) {
+            console.log('✅ No se encontraron transacciones inválidas para eliminar');
+            return 0;
+        }
+
+        // Eliminar transacciones inválidas
+        const { error: deleteError } = await client
+            .from('transactions')
+            .delete()
+            .in('id', invalidIds)
+            .eq('user_id', user.id);
+
+        if (deleteError) throw deleteError;
+
+        console.log(`✅ Eliminadas ${invalidIds.length} transacciones inválidas`);
+        return invalidIds.length;
+    } catch (error) {
+        console.error('Error eliminando transacciones inválidas:', error);
+        throw error;
+    }
+}
+
 // Exportar createTransaction al final (las demás ya tienen export inline)
 export { 
-    createTransaction
+    createTransaction,
+    deleteTransaction,
+    deleteInvalidTransactions
 };
