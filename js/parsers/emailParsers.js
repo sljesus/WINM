@@ -294,12 +294,16 @@ class MercadoPagoEmailParser extends BaseEmailParser {
         const body = (emailContent.body || '').toLowerCase();
         const text = `${subject} ${body}`;
 
-        // Excluir pagos rechazados, intentos fallidos, etc. (no son transacciones reales)
+        // Excluir pagos rechazados, intentos fallidos, estados de cuenta, límites, etc. (no son transacciones reales)
         const excludeKeywords = [
             'promoción', 'oferta', 'publicidad', 'newsletter', 'sorteo',
             'pago rechazado', 'rechazado', 'rechazada', 'intento fallido',
             'no se pudo', 'no se completó', 'falló', 'fallido', 'error en el pago',
-            'pago no procesado', 'transacción cancelada', 'cancelado', 'cancelada'
+            'pago no procesado', 'transacción cancelada', 'cancelado', 'cancelada',
+            'estado de cuenta', 'descargar tu estado', 'descarga tu estado',
+            'tu límite es', 'límite disponible', 'límite de crédito',
+            'resumen mensual', 'extracto bancario', 'resumen de cuenta',
+            'ya puedes descargar', 'descarga tu resumen'
         ];
 
         // Verificar exclusiones primero
@@ -536,12 +540,16 @@ class BBVAEmailParser extends BaseEmailParser {
         const body = (emailContent.body || '').toLowerCase();
         const text = `${subject} ${body}`;
 
-        // Excluir pagos rechazados, intentos fallidos, etc. (no son transacciones reales)
+        // Excluir pagos rechazados, intentos fallidos, estados de cuenta, límites, etc. (no son transacciones reales)
         const excludeKeywords = [
-            'estado de cuenta', 'promoción', 'oferta',
+            'promoción', 'oferta', 'publicidad', 'newsletter', 'sorteo',
             'pago rechazado', 'rechazado', 'rechazada', 'intento fallido',
             'no se pudo', 'no se completó', 'falló', 'fallido', 'error en el pago',
-            'pago no procesado', 'transacción cancelada', 'cancelado', 'cancelada'
+            'pago no procesado', 'transacción cancelada', 'cancelado', 'cancelada',
+            'estado de cuenta', 'descargar tu estado', 'descarga tu estado',
+            'tu límite es', 'límite disponible', 'límite de crédito',
+            'resumen mensual', 'extracto bancario', 'resumen de cuenta',
+            'ya puedes descargar', 'descarga tu resumen'
         ];
 
         const hasExclusion = excludeKeywords.some(keyword => text.includes(keyword));
@@ -638,12 +646,16 @@ class NUEmailParser extends BaseEmailParser {
         const body = (emailContent.body || '').toLowerCase();
         const text = `${subject} ${body}`;
 
-        // Excluir pagos rechazados, intentos fallidos, etc. (no son transacciones reales)
+        // Excluir pagos rechazados, intentos fallidos, estados de cuenta, límites, etc. (no son transacciones reales)
         const excludeKeywords = [
             'promoción', 'oferta', 'publicidad', 'newsletter', 'invitación',
             'pago rechazado', 'rechazado', 'rechazada', 'intento fallido',
             'no se pudo', 'no se completó', 'falló', 'fallido', 'error en el pago',
-            'pago no procesado', 'transacción cancelada', 'cancelado', 'cancelada'
+            'pago no procesado', 'transacción cancelada', 'cancelado', 'cancelada',
+            'estado de cuenta', 'descargar tu estado', 'descarga tu estado',
+            'tu límite es', 'límite disponible', 'límite de crédito',
+            'resumen mensual', 'extracto bancario', 'resumen de cuenta',
+            'ya puedes descargar', 'descarga tu resumen'
         ];
 
         const hasExclusion = excludeKeywords.some(keyword => text.includes(keyword));
@@ -741,13 +753,28 @@ class PlataCardEmailParser extends BaseEmailParser {
         const body = (emailContent.body || '').toLowerCase();
         const text = `${subject} ${body}`;
 
-        const transactionKeywords = ['compra', 'pago', 'cargo', 'recibiste', 'transacción'];
-        const excludeKeywords = ['promoción', 'oferta', 'publicidad', 'newsletter'];
+        // Excluir pagos rechazados, intentos fallidos, estados de cuenta, límites, etc. (no son transacciones reales)
+        const excludeKeywords = [
+            'promoción', 'oferta', 'publicidad', 'newsletter',
+            'pago rechazado', 'rechazado', 'rechazada', 'intento fallido',
+            'no se pudo', 'no se completó', 'falló', 'fallido', 'error en el pago',
+            'pago no procesado', 'transacción cancelada', 'cancelado', 'cancelada',
+            'estado de cuenta', 'descargar tu estado', 'descarga tu estado',
+            'tu límite es', 'límite disponible', 'límite de crédito',
+            'resumen mensual', 'extracto bancario', 'resumen de cuenta',
+            'ya puedes descargar', 'descarga tu resumen'
+        ];
 
-        const hasTransaction = transactionKeywords.some(keyword => text.includes(keyword));
         const hasExclusion = excludeKeywords.some(keyword => text.includes(keyword));
+        if (hasExclusion) {
+            console.log('🚫 Email excluido (pago rechazado, estado de cuenta o límite):', subject.substring(0, 50));
+            return false;
+        }
 
-        return hasTransaction && !hasExclusion;
+        const transactionKeywords = ['compra', 'pago', 'cargo', 'recibiste', 'transacción'];
+        const hasTransaction = transactionKeywords.some(keyword => text.includes(keyword));
+
+        return hasTransaction;
     }
 
     extractDescription(body, subject) {

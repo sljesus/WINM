@@ -244,11 +244,15 @@ function formatTransaction(analysisResult: any, emailContent: EmailContent): any
     const body = (emailContent.body || '').toLowerCase()
     const fullText = `${subject} ${body} ${description}`.toLowerCase()
     
-    // Detectar pagos rechazados o intentos fallidos
+    // Detectar pagos rechazados, intentos fallidos, estados de cuenta, límites, etc.
     const rejectionKeywords = [
       'pago rechazado', 'rechazado', 'rechazada', 'intento fallido',
       'no se pudo', 'no se completó', 'falló', 'fallido', 'error en el pago',
-      'pago no procesado', 'transacción cancelada', 'cancelado', 'cancelada'
+      'pago no procesado', 'transacción cancelada', 'cancelado', 'cancelada',
+      'estado de cuenta', 'descargar tu estado', 'descarga tu estado',
+      'tu límite es', 'límite disponible', 'límite de crédito',
+      'resumen mensual', 'extracto bancario', 'resumen de cuenta',
+      'ya puedes descargar', 'descarga tu resumen'
     ]
     
     if (rejectionKeywords.some(keyword => fullText.includes(keyword))) {
