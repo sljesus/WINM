@@ -29,20 +29,21 @@ export class EmailAnalyzerFactory {
 
         const analyzers = [];
 
-        // Siempre incluir regex si está habilitado (base confiable)
-        if (useRegex) {
-            analyzers.push(new RegexEmailAnalyzer());
-        }
-
-        // Agregar OpenAI si está configurado y habilitado
-        // Ya no requiere apiKey (se usa Edge Function segura)
+        // PRIORIDAD: IA primero (mejor precisión, determina si es válida)
+        // Regex como fallback (gratis, rápido)
         if (useOpenAI) {
             try {
                 analyzers.push(new OpenAIEmailAnalyzer(null)); // apiKey deprecated
-                console.log('✅ EmailAnalyzerFactory: OpenAI analyzer agregado (usando Edge Function)');
+                console.log('✅ EmailAnalyzerFactory: OpenAI analyzer agregado PRIMERO (usando Edge Function)');
             } catch (error) {
                 console.warn('⚠️ EmailAnalyzerFactory: Error creando OpenAI analyzer:', error);
             }
+        }
+
+        // Regex como fallback si está habilitado
+        if (useRegex) {
+            analyzers.push(new RegexEmailAnalyzer());
+            console.log('✅ EmailAnalyzerFactory: Regex analyzer agregado como fallback');
         }
 
         // Estrategia de creación
