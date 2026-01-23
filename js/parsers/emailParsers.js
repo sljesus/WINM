@@ -287,7 +287,7 @@ class MercadoPagoEmailParser extends BaseEmailParser {
         const body = (emailContent.body || '').toLowerCase();
         const text = `${subject} ${body}`;
 
-        // Excluir pagos rechazados, intentos fallidos, estados de cuenta, límites, etc. (no son transacciones reales)
+        // Excluir pagos rechazados, intentos fallidos, estados de cuenta, límites, reportes, etc. (no son transacciones reales)
         const excludeKeywords = [
             'promoción', 'oferta', 'publicidad', 'newsletter', 'sorteo',
             'pago rechazado', 'rechazado', 'rechazada', 'intento fallido',
@@ -296,13 +296,18 @@ class MercadoPagoEmailParser extends BaseEmailParser {
             'estado de cuenta', 'descargar tu estado', 'descarga tu estado',
             'tu límite es', 'límite disponible', 'límite de crédito',
             'resumen mensual', 'extracto bancario', 'resumen de cuenta',
-            'ya puedes descargar', 'descarga tu resumen'
+            'ya puedes descargar', 'descarga tu resumen',
+            // Reportes, métricas e informes técnicos (no son transacciones)
+            'integración', 'integraciones', 'desempeño', 'medimos', 'métrica', 'métricas',
+            'reporte', 'reportes', 'análisis', 'estadística', 'estadísticas',
+            'dashboard', 'monitoreo', 'seguimiento', 'rendimiento', 'performance',
+            'api', 'endpoint', 'webhook', 'desarrollador', 'developer'
         ];
 
         // Verificar exclusiones primero
         const hasExclusion = excludeKeywords.some(keyword => text.includes(keyword));
         if (hasExclusion) {
-            console.log('🚫 Email excluido (pago rechazado o intento fallido):', subject.substring(0, 50));
+            console.log('🚫 Email excluido (no es transacción válida):', subject.substring(0, 50));
             return false;
         }
 
