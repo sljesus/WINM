@@ -305,15 +305,7 @@ export async function getSources() {
     }
 }
 
-// Exportar todas las funciones al final para asegurar compatibilidad con GitHub Pages
+// Exportar createTransaction al final (las demás ya tienen export inline)
 export { 
-    loadTransactions,
-    calculateStats,
-    getTransactionsByMonth,
-    getTransactionsByCategory,
-    searchTransactions,
-    updateCategory,
-    getCategories,
-    createTransaction,
-    getSources
+    createTransaction
 };
