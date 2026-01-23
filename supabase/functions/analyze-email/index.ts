@@ -260,10 +260,11 @@ Fecha: ${emailContent.date}
 Contenido: ${emailContent.body.substring(0, 2000)}
 
 IMPORTANTE - EXTRACCIÓN DE MONTOS:
-- Si el email dice "Pagaste $X" o "recibimos un pago por $X", ese es el monto correcto
-- Busca el monto más grande y relevante en el contexto de la transacción
-- Prioriza montos que aparecen cerca de palabras clave como "Pagaste", "pago recibido", "recibimos un pago"
-- Ignora montos pequeños que puedan ser referencias, límites, o montos parciales
+- Si el email dice "Pagaste $X" (ej: "Pagaste $ 2,491.77"), ESE es el monto correcto, NO otro monto
+- Para pagos de tarjeta de crédito: busca específicamente el monto después de "Pagaste"
+- Si hay múltiples montos, prioriza el que aparece después de "Pagaste" o "recibimos un pago por"
+- Ignora montos pequeños (como $500) si hay un monto más grande después de "Pagaste"
+- El monto correcto es el que está directamente relacionado con la acción de pago mencionada
 
 Categorías disponibles:
 ${categoriesList}

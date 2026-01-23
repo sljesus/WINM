@@ -34,20 +34,27 @@ class BaseEmailParser {
         // Patrones mejorados para montos (priorizar montos con contexto específico de transacción)
         const patterns = [
             // PRIORIDAD 1: Monto después de "Pagaste" (muy específico para pagos de tarjeta)
-            /pagaste\s+\$\s*([\d,]+\.?\d{2})/i,
-            // PRIORIDAD 2: Monto después de "recibimos un pago" (pagos de tarjeta)
-            /recibimos\s+(?:un\s+)?pago\s+(?:por|de|en)\s+\$\s*([\d,]+\.?\d{2})/i,
-            // PRIORIDAD 3: Monto con palabras clave específicas de transacción
-            /(?:recibiste|ingresó|pagaste|pago|monto|total|importe|cantidad|dinero)[\s:]*\$?\s*([\d,]+\.?\d{2})/i,
-            // PRIORIDAD 4: Monto con símbolo de peso mexicano (general)
+            // Captura: "Pagaste $ 2,491.77" o "Pagaste $2,491.77" o "Pagaste$2,491.77"
+            /pagaste\s*\$?\s*([\d,]+\.?\d{2})/i,
+            // PRIORIDAD 2: Monto después de "recibimos un pago por" (pagos de tarjeta)
+            /recibimos\s+(?:un\s+)?pago\s+(?:por|de|en)\s+(?:el\s+)?(?:estado\s+de\s+cuenta\s+de\s+tu\s+tarjeta|tu\s+tarjeta)[^.]*?\$\s*([\d,]+\.?\d{2})/i,
+            // PRIORIDAD 3: Monto grande después de "recibimos un pago" (buscar el monto más grande)
+            /recibimos\s+(?:un\s+)?pago[^.]*?\$\s*([\d,]{4,}\.?\d{2})/i, // Montos de 4+ dígitos
+            // PRIORIDAD 4: Monto con palabras clave específicas de transacción (pero no "pagaste" ya capturado)
+            /(?:recibiste|ingresó|monto|total|importe|cantidad|dinero)[\s:]*\$?\s*([\d,]+\.?\d{2})/i,
+            // PRIORIDAD 5: Monto con símbolo de peso mexicano (general, pero priorizar montos grandes)
+            /\$\s*([\d,]{4,}\.?\d{2})/, // Montos de 4+ dígitos primero
+            // PRIORIDAD 6: Monto con símbolo de peso mexicano (general, todos los tamaños)
             /\$\s*([\d,]+\.?\d{2})/,
-            // PRIORIDAD 5: Monto con palabras de moneda
+            // PRIORIDAD 7: Monto con palabras de moneda
             /([\d,]+\.?\d{2})\s*(?:MXN|pesos|peso|mxn)/i,
-            // PRIORIDAD 6: Monto con símbolo (sin decimales estrictos)
+            // PRIORIDAD 8: Monto con símbolo (sin decimales estrictos)
             /\$\s*([\d,]+\.?\d*)/,
-            // PRIORIDAD 7: Monto solo con números (solo si tiene formato de dinero: 3+ dígitos o con decimales)
+            // PRIORIDAD 9: Monto solo con números grandes (formato de dinero: 4+ dígitos con decimales)
+            /\b(\d{4,}(?:,\d{3})*(?:\.\d{2})?)\b/,
+            // PRIORIDAD 10: Monto solo con números (formato de dinero: 3+ dígitos con decimales)
             /\b(\d{3,}(?:,\d{3})*(?:\.\d{2})?)\b/,
-            // PRIORIDAD 8: Monto pequeño con decimales (100.00, 140.00, etc.)
+            // PRIORIDAD 11: Monto pequeño con decimales (100.00, 140.00, etc.)
             /\b(\d{1,3}\.\d{2})\b/
         ];
 
@@ -235,8 +242,29 @@ class MercadoPagoEmailParser extends BaseEmailParser {
             return null;
         }
 
-        // Extraer monto
-        const amount = this.extractAmount(body || subject);
+        // Extraer monto - para pagos de tarjeta, buscar específicamente después de "Pagaste"
+        let amount = null;
+        const fullTextLower = (body + ' ' + subject).toLowerCase();
+        
+        // Si es pago de tarjeta, buscar específicamente el monto después de "Pagaste"
+        if (fullTextLower.includes('recibimos') && fullTextLower.includes('pago') && 
+            (fullTextLower.includes('tarjeta') || fullTextLower.includes('crédito'))) {
+            // Buscar específicamente "Pagaste $X" o "Pagaste$X"
+            const pagasteMatch = (body + ' ' + subject).match(/pagaste\s*\$?\s*([\d,]+\.?\d{2})/i);
+            if (pagasteMatch && pagasteMatch[1]) {
+                const cleanAmount = pagasteMatch[1].replace(/,/g, '');
+                amount = parseFloat(cleanAmount);
+                if (isNaN(amount) || amount <= 0) {
+                    amount = null;
+                }
+            }
+        }
+        
+        // Si no se encontró con el método específico, usar el método general
+        if (amount === null) {
+            amount = this.extractAmount(body || subject);
+        }
+        
         if (amount === null) {
             return null;
         }
