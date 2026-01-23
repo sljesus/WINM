@@ -3,81 +3,43 @@
 // Principio SOLID: Single Responsibility - solo análisis con OpenAI
 
 import { IEmailAnalyzer } from './IEmailAnalyzer.js';
-import { getCategories } from '../transactionService.js';
 
 /**
  * Analizador de emails usando OpenAI API
- * Responsabilidad única: análisis inteligente con IA
+ * SOLID SRP: solo análisis con IA. Categorías se inyectan vía options (orquestador).
  */
 export class OpenAIEmailAnalyzer extends IEmailAnalyzer {
     constructor(apiKey) {
         super();
         this.name = 'OpenAIEmailAnalyzer';
-        // apiKey ya no se usa directamente, pero mantenemos el parámetro por compatibilidad
         this.apiKey = apiKey; // Deprecated: ahora se usa Edge Function
         this.initialized = false;
-        this.categoriesCache = null;
-        this.categoriesLoaded = false;
         this.supabaseUrl = null;
         this.supabaseAnonKey = null;
     }
 
-    /**
-     * Inicializa el analizador (carga configuración de Supabase y categorías)
-     */
     async initialize() {
         if (this.initialized) return;
-
-        // Obtener configuración de Supabase desde CONFIG global
         const config = window.CONFIG || (typeof CONFIG !== 'undefined' ? CONFIG : null);
-        
-        if (!config || !config.supabase || !config.supabase.url || !config.supabase.anonKey) {
+        if (!config?.supabase?.url || !config?.supabase?.anonKey) {
             throw new Error('Configuración de Supabase incompleta. Verifica config.js');
         }
-
         this.supabaseUrl = config.supabase.url;
         this.supabaseAnonKey = config.supabase.anonKey;
-
-        // Cargar categorías para categorización automática
-        await this._loadCategories();
-
         this.initialized = true;
-        console.log(`✅ ${this.name}: Analizador OpenAI inicializado (usando Edge Function) con ${this.categoriesCache?.length || 0} categorías`);
     }
 
     /**
-     * Carga las categorías disponibles del sistema
-     */
-    async _loadCategories() {
-        if (this.categoriesLoaded) return;
-
-        try {
-            this.categoriesCache = await getCategories();
-            this.categoriesLoaded = true;
-            console.log(`📂 ${this.name}: Cargadas ${this.categoriesCache.length} categorías para IA`);
-        } catch (error) {
-            console.warn(`⚠️ ${this.name}: Error cargando categorías:`, error);
-            // Categorías por defecto si falla la carga
-            this.categoriesCache = [
-                { id: 'default', name: 'Sin categorizar' }
-            ];
-        }
-    }
-
-    /**
-     * Analiza email usando OpenAI a través de Edge Function (seguro)
+     * Analiza email usando OpenAI vía Edge Function.
      * @param {Object} emailContent - Contenido del email
-     * @returns {Promise<Object|null>} Transacción extraída o null
+     * @param {Object} [options] - { categories } inyectadas por orquestador (no obtiene aquí).
      */
-    async analyzeEmail(emailContent) {
+    async analyzeEmail(emailContent, options = {}) {
         try {
             await this.initialize();
+            const categories = options.categories ?? [];
 
-            console.log(`🤖 ${this.name}: Analizando email ${emailContent.id} con IA (Edge Function)`);
-
-            // Llamar a la Edge Function de Supabase (proxy seguro)
             const edgeFunctionUrl = `${this.supabaseUrl}/functions/v1/analyze-email`;
-            
             const apiResponse = await fetch(edgeFunctionUrl, {
                 method: 'POST',
                 headers: {
@@ -92,7 +54,7 @@ export class OpenAIEmailAnalyzer extends IEmailAnalyzer {
                         from: emailContent.from || '',
                         date: emailContent.date || new Date().toISOString()
                     },
-                    categories: this.categoriesCache || []
+                    categories
                 })
             });
 

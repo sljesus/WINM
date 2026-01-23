@@ -1,38 +1,26 @@
 // Servicio de Categorías
 // Principio SOLID: Responsabilidad única - Lógica de negocio de categorías
 
-import { getSupabaseClient } from './supabaseService.js';
+import { getSupabaseClient, ensureUser } from './supabaseService.js';
 
 /**
  * Carga todas las categorías (sistema + personalizadas del usuario)
+ * Única fuente de categorías (getCategories en transactionService delega aquí).
  * @returns {Promise<Array>} Array de categorías
  */
 export async function loadCategories() {
-    try {
-        const client = getSupabaseClient();
-        const { data: { user } } = await client.auth.getUser();
-        
-        if (!user) {
-            throw new Error('Usuario no autenticado');
-        }
+    const user = await ensureUser();
+    const client = getSupabaseClient();
 
-        // SELECT desde categories
-        // Filtrar: is_system = true OR user_id = current_user
-        // Ordenar: is_system DESC, name ASC
-        // Patrón igual a getCategories() en transactionService.js
-        const { data, error } = await client
-            .from('categories')
-            .select('id, name, icon, color, is_system, user_id, created_at')
-            .or(`is_system.eq.true,user_id.eq.${user.id}`)
-            .order('is_system', { ascending: false })
-            .order('name', { ascending: true });
+    const { data, error } = await client
+        .from('categories')
+        .select('id, name, icon, color, is_system, user_id, created_at')
+        .or(`is_system.eq.true,user_id.eq.${user.id}`)
+        .order('is_system', { ascending: false })
+        .order('name', { ascending: true });
 
-        if (error) throw error;
-        return data || [];
-    } catch (error) {
-        console.error('Error cargando categorías:', error);
-        throw error;
-    }
+    if (error) throw error;
+    return data ?? [];
 }
 
 /**
@@ -44,14 +32,10 @@ export async function loadCategories() {
  * @returns {Promise<Object>} Categoría creada
  */
 export async function createCategory(categoryData) {
-    try {
-        const client = getSupabaseClient();
-        const { data: { user } } = await client.auth.getUser();
-        
-        if (!user) {
-            throw new Error('Usuario no autenticado');
-        }
+    const user = await ensureUser();
+    const client = getSupabaseClient();
 
+    try {
         // Validar datos básicos
         if (!categoryData.name || categoryData.name.trim() === '') {
             throw new Error('El nombre de la categoría es requerido');
@@ -105,14 +89,10 @@ export async function createCategory(categoryData) {
  * @returns {Promise<Object>} Categoría actualizada
  */
 export async function updateCategory(categoryId, updates) {
-    try {
-        const client = getSupabaseClient();
-        const { data: { user } } = await client.auth.getUser();
-        
-        if (!user) {
-            throw new Error('Usuario no autenticado');
-        }
+    const user = await ensureUser();
+    const client = getSupabaseClient();
 
+    try {
         // Preparar datos de actualización
         const updateData = {};
         
@@ -179,14 +159,10 @@ export async function updateCategory(categoryId, updates) {
  * @returns {Promise<void>}
  */
 export async function deleteCategory(categoryId) {
-    try {
-        const client = getSupabaseClient();
-        const { data: { user } } = await client.auth.getUser();
-        
-        if (!user) {
-            throw new Error('Usuario no autenticado');
-        }
+    const user = await ensureUser();
+    const client = getSupabaseClient();
 
+    try {
         // DELETE de tabla categories
         // Solo categorías personalizadas (is_system = FALSE)
         // Las transacciones que usan esta categoría se manejan con ON DELETE SET NULL en la FK
@@ -216,14 +192,10 @@ export async function deleteCategory(categoryId) {
  * @returns {Promise<Object>} Estadísticas (totalSpent, transactionCount)
  */
 export async function getCategoryStats(categoryId) {
-    try {
-        const client = getSupabaseClient();
-        const { data: { user } } = await client.auth.getUser();
-        
-        if (!user) {
-            throw new Error('Usuario no autenticado');
-        }
+    const user = await ensureUser();
+    const client = getSupabaseClient();
 
+    try {
         // SELECT COUNT y SUM desde transactions
         // Agrupar por category_id
         // Solo gastos (amount < 0)

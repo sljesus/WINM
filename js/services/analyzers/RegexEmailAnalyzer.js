@@ -18,12 +18,10 @@ export class RegexEmailAnalyzer extends IEmailAnalyzer {
     /**
      * Analiza email usando el parser regex existente
      * @param {Object} emailContent - Contenido del email
-     * @returns {Promise<Object|null>} Transacción extraída o null
+     * @param {Object} [options] - Opcional; ignorado por regex
      */
-    async analyzeEmail(emailContent) {
+    async analyzeEmail(emailContent, options = {}) {
         try {
-            console.log(`🔍 ${this.name}: Analizando email ${emailContent.id}`);
-
             // Delegar al parser regex existente
             const transaction = parseEmailTransaction(emailContent);
 

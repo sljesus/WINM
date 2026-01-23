@@ -4,7 +4,8 @@
 
 import { searchBankEmails, getEmailContent } from './gmailAPIService.js';
 import { EmailAnalyzerFactory } from './analyzers/EmailAnalyzerFactory.js';
-import { createTransaction } from './transactionService.js';
+import { createTransaction, getCategories } from './transactionService.js';
+import { existsByEmailId } from './repositories/transactionRepository.js';
 
 /**
  * Servicio para importar transacciones desde Gmail
@@ -135,10 +136,19 @@ class TransactionImportService {
 
         this.reportProgress(`Encontrados ${emails.length} emails de bancos`);
 
-        // 2. Procesar emails y extraer transacciones
-        const transactions = await this._processEmails(emails, skipDuplicates);
+        // 2. Categorías para IA (orquestador las obtiene; analizador no accede a BD)
+        let categories = [];
+        try {
+            categories = await getCategories();
+        } catch (e) {
+            console.warn('⚠️ No se pudieron cargar categorías para IA:', e);
+        }
 
-        // 3. Guardar transacciones en BD
+        // 3. Procesar emails y extraer transacciones
+        const transactions = await this._processEmails(emails, skipDuplicates, categories);
+
+        // 4. Guardar en BD vía repositorio (createTransaction usa transactionRepository)
+
         const savedTransactions = await this._saveTransactions(transactions);
 
         return {
@@ -173,101 +183,37 @@ class TransactionImportService {
      * Procesa emails y extrae transacciones
      * @param {Array} emailIds - IDs de emails
      * @param {boolean} skipDuplicates - Si omitir duplicados
+     * @param {Array} categories - Categorías para IA (inyectadas; sin acceso a BD en analizador)
      * @returns {Promise<Array>} Lista de transacciones
      */
-    async _processEmails(emailIds, skipDuplicates) {
+    async _processEmails(emailIds, skipDuplicates, categories = []) {
         const transactions = [];
 
         for (const emailInfo of emailIds) {
             try {
-                // Obtener contenido completo del email
                 const emailContent = await getEmailContent(emailInfo.id);
-
-                if (!emailContent || !emailContent.body) {
+                if (!emailContent?.body) {
                     this.reportProgress(`Email ${emailInfo.id} sin contenido, omitiendo`);
                     continue;
                 }
 
-                // Analizar email con el sistema de IA (KISS: una sola línea cambió)
-                const transaction = await this.emailAnalyzer.analyzeEmail(emailContent);
+                const transaction = await this.emailAnalyzer.analyzeEmail(emailContent, { categories });
 
                 if (transaction) {
-                    // Verificar duplicados si es necesario
-                    if (skipDuplicates && await this._isDuplicateTransaction(transaction)) {
+                    if (skipDuplicates && (await existsByEmailId(transaction.email_id))) {
                         this.reportProgress(`Transacción duplicada omitida: ${transaction.description}`);
                         continue;
                     }
-
                     transactions.push(transaction);
                     const analyzerInfo = transaction.analyzer_used ? ` (${transaction.analyzer_used})` : '';
                     this.reportProgress(`Transacción extraída${analyzerInfo}: ${transaction.description} - $${Math.abs(transaction.amount).toFixed(2)}`);
                 }
-                // No reportar cuando no se puede extraer transacción (es normal para emails no transaccionales)
-
             } catch (error) {
                 this.reportError(`Error procesando email ${emailInfo.id}`, error);
-                continue;
             }
         }
 
         return transactions;
-    }
-
-    /**
-     * Verifica si una transacción ya existe (basado en email_id)
-     * @param {Object} transaction - Transacción a verificar
-     * @returns {Promise<boolean>} True si es duplicada
-     */
-    async _isDuplicateTransaction(transaction) {
-        try {
-            // Verificar si ya existe una transacción con el mismo email_id
-            // Esto es una verificación simple - en producción podría ser más compleja
-            const existing = await this._checkExistingTransaction(transaction.email_id);
-            return existing !== null;
-        } catch (error) {
-            // Si hay error verificando, asumir que no es duplicada
-            return false;
-        }
-    }
-
-    /**
-     * Verifica si existe una transacción con el mismo email_id
-     * @param {string} emailId - ID del email
-     * @returns {Promise<Object|null>} Transacción existente o null
-     */
-    async _checkExistingTransaction(emailId) {
-        try {
-            // Importar dinámicamente para evitar dependencias circulares
-            const { getSupabaseClient } = await import('./supabaseService.js');
-
-            const client = getSupabaseClient();
-            const { data: { user } } = await client.auth.getUser();
-
-            if (!user) {
-                return null;
-            }
-
-            const { data, error } = await client
-                .from('transactions')
-                .select('id, email_id', { count: 'exact' })
-                .eq('user_id', user.id)
-                .eq('email_id', emailId)
-                .maybeSingle(); // Usar maybeSingle en lugar de single para evitar 406
-
-            if (error) {
-                // Si no encuentra la transacción, error.code será 'PGRST116'
-                if (error.code === 'PGRST116') {
-                    return null; // No existe
-                }
-                console.error('Error verificando transacción existente:', error);
-                return null;
-            }
-
-            return data; // Existe
-        } catch (error) {
-            console.error('Error en _checkExistingTransaction:', error);
-            return null;
-        }
     }
 
     /**

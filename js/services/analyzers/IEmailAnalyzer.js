@@ -10,6 +10,7 @@ export class IEmailAnalyzer {
     /**
      * Analiza contenido de email y extrae datos de transacción
      * @param {Object} emailContent - Contenido del email con subject, body, id, date, from
+     * @param {Object} [options] - Opciones (ej. { categories } para IA). Opcional.
      * @returns {Promise<Object|null>} Datos de transacción estructurados o null si no es transacción
      *
      * Estructura esperada del resultado:
@@ -27,7 +28,7 @@ export class IEmailAnalyzer {
      *   analyzed_by_ai: boolean // Si fue analizado por IA
      * }
      */
-    async analyzeEmail(emailContent) {
+    async analyzeEmail(emailContent, options = {}) {
         throw new Error('Método analyzeEmail debe ser implementado por subclases');
     }
 }

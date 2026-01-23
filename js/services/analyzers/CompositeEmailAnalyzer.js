@@ -46,15 +46,13 @@ export class CompositeEmailAnalyzer extends IEmailAnalyzer {
      * @param {Object} emailContent - Contenido del email
      * @returns {Promise<Object|null>} Primer resultado válido o null
      */
-    async analyzeEmail(emailContent) {
-        // Logs de debug removidos - solo mostrar errores importantes
-
+    async analyzeEmail(emailContent, options = {}) {
         for (let i = 0; i < this.analyzers.length; i++) {
             const analyzer = this.analyzers[i];
             const analyzerName = analyzer.name || analyzer.constructor.name;
 
             try {
-                const result = await analyzer.analyzeEmail(emailContent);
+                const result = await analyzer.analyzeEmail(emailContent, options);
 
                 if (result) {
                     // Solo log si es exitoso (importante para debugging)

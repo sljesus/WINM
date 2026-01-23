@@ -33,6 +33,20 @@ export function getSupabaseClient() {
 }
 
 /**
+ * Obtiene el usuario actual o lanza error si no hay sesión.
+ * Único punto para "user requerido" (DRY, evita repetir getSupabaseClient + getUser + throw).
+ * @returns {Promise<Object>} Usuario actual
+ * @throws {Error} Si no hay usuario autenticado
+ */
+export async function ensureUser() {
+    const client = getSupabaseClient();
+    const { data: { user }, error } = await client.auth.getUser();
+    if (error) throw error;
+    if (!user) throw new Error('Usuario no autenticado');
+    return user;
+}
+
+/**
  * Obtiene el usuario actual
  * @returns {Promise<Object|null>} Usuario actual o null
  */
