@@ -235,6 +235,10 @@ function buildAnalysisPrompt(emailContent: EmailContent, categories?: Array<{ id
 
   return `Analiza el siguiente email bancario y determina si es una transacción financiera VÁLIDA (que realmente afectó el balance de la cuenta).
 
+IMPORTANTE - CASOS ESPECIALES:
+- "Recibimos un pago en tu tarjeta de crédito" = EGRESO (pago de saldo, no ingreso)
+- "Pago recibido en tarjeta" = EGRESO (estás pagando el saldo de la tarjeta)
+
 IMPORTANTE: EXCLUYE los siguientes casos (NO son transacciones válidas):
 - Pagos rechazados, intentos fallidos, transacciones canceladas
 - Notificaciones de error, fallos en el procesamiento
