@@ -31,22 +31,27 @@ class BaseEmailParser {
         // Limpiar texto primero
         const cleanText = this.cleanAmountText(text);
 
-        // Patrones mejorados para montos (priorizar montos con contexto de transacción)
+        // Patrones mejorados para montos (priorizar montos con contexto específico de transacción)
         const patterns = [
-            // Monto con símbolo de peso mexicano (más específico: cerca de palabras clave)
+            // PRIORIDAD 1: Monto después de "Pagaste" (muy específico para pagos de tarjeta)
+            /pagaste\s+\$\s*([\d,]+\.?\d{2})/i,
+            // PRIORIDAD 2: Monto después de "recibimos un pago" (pagos de tarjeta)
+            /recibimos\s+(?:un\s+)?pago\s+(?:por|de|en)\s+\$\s*([\d,]+\.?\d{2})/i,
+            // PRIORIDAD 3: Monto con palabras clave específicas de transacción
             /(?:recibiste|ingresó|pagaste|pago|monto|total|importe|cantidad|dinero)[\s:]*\$?\s*([\d,]+\.?\d{2})/i,
-            // Monto con símbolo de peso mexicano (general)
+            // PRIORIDAD 4: Monto con símbolo de peso mexicano (general)
             /\$\s*([\d,]+\.?\d{2})/,
-            // Monto con palabras de moneda
+            // PRIORIDAD 5: Monto con palabras de moneda
             /([\d,]+\.?\d{2})\s*(?:MXN|pesos|peso|mxn)/i,
-            // Monto con símbolo (sin decimales estrictos)
+            // PRIORIDAD 6: Monto con símbolo (sin decimales estrictos)
             /\$\s*([\d,]+\.?\d*)/,
-            // Monto solo con números (solo si tiene formato de dinero: 3+ dígitos o con decimales)
+            // PRIORIDAD 7: Monto solo con números (solo si tiene formato de dinero: 3+ dígitos o con decimales)
             /\b(\d{3,}(?:,\d{3})*(?:\.\d{2})?)\b/,
-            // Monto pequeño con decimales (100.00, 140.00, etc.)
+            // PRIORIDAD 8: Monto pequeño con decimales (100.00, 140.00, etc.)
             /\b(\d{1,3}\.\d{2})\b/
         ];
 
+        // Buscar en orden de prioridad (el primero que encuentre un monto válido es el correcto)
         for (const pattern of patterns) {
             const matches = [...cleanText.matchAll(new RegExp(pattern.source, pattern.flags + 'g'))];
             for (const match of matches) {
