@@ -165,6 +165,28 @@ Deno.serve(async (req) => {
     // Validar y formatear respuesta
     const transaction = formatTransaction(analysisResult, emailContent)
 
+    // Si formatTransaction retorna null, no es una transacción válida
+    if (!transaction) {
+      console.log(`🚫 Email ${emailContent.id} no es una transacción válida`)
+      return new Response(
+        JSON.stringify({
+          success: false,
+          transaction: null,
+          reason: 'No es una transacción válida (pago rechazado, estado de cuenta, límite, etc.)',
+          analyzer_used: 'OpenAI'
+        }),
+        { 
+          status: 200, 
+          headers: { 
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Methods': 'POST, OPTIONS',
+            'Access-Control-Allow-Headers': 'Content-Type, Authorization'
+          } 
+        }
+      )
+    }
+
     console.log(`✅ Email analizado exitosamente: ${emailContent.id}`)
 
     return new Response(
