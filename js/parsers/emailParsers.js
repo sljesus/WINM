@@ -270,13 +270,6 @@ class MercadoPagoEmailParser extends BaseEmailParser {
             bank: source
         };
 
-        // Log removido - demasiado ruido
-            amount: transaction.amount,
-            description: transaction.description,
-            date: transaction.date,
-            source: transaction.source
-        });
-
         return this.validateTransaction(transaction) ? transaction : null;
     }
 
@@ -516,13 +509,6 @@ class BBVAEmailParser extends BaseEmailParser {
             bank: source
         };
 
-        // Log removido - demasiado ruido
-            amount: transaction.amount,
-            description: transaction.description,
-            date: transaction.date,
-            source: transaction.source
-        });
-
         return this.validateTransaction(transaction) ? transaction : null;
     }
 
@@ -621,13 +607,6 @@ class NUEmailParser extends BaseEmailParser {
             needs_categorization: false,
             bank: source
         };
-
-        console.log('📊 Transacción NU creada:', {
-            amount: transaction.amount,
-            description: transaction.description,
-            date: transaction.date,
-            source: transaction.source
-        });
 
         return this.validateTransaction(transaction) ? transaction : null;
     }
@@ -728,13 +707,6 @@ class PlataCardEmailParser extends BaseEmailParser {
             needs_categorization: false,
             bank: source
         };
-
-        // Log removido - demasiado ruido
-            amount: transaction.amount,
-            description: transaction.description,
-            date: transaction.date,
-            source: transaction.source
-        });
 
         return this.validateTransaction(transaction) ? transaction : null;
     }
