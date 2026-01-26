@@ -95,9 +95,56 @@ class NUParser(BaseParser):
         return has_transaction and not has_exclusion
     
     def _extract_amount_from_text(self, text: str) -> Optional[float]:
-        """Extrae monto de formato NU"""
-        amount = self.extract_amount(text)
-        return amount
+        """Extrae monto de formato NU con contexto específico"""
+        
+        # PATRONES ESPECÍFICOS CON CONTEXTO (prioridad alta)
+        specific_patterns = [
+            # NU: "Pagaste $500.00", "Compraste por $500.00"
+            r'Pagaste\s+\$?([\d,]+\.?\d*)',
+            
+            # "Compra en [lugar] por $500.00"
+            r'Compra\s+(?:en|a|de)\s+[^\$]*?\$?([\d,]+\.?\d*)',
+            
+            # "Tu compra por $500.00", "Gastaste $500.00"
+            r'(?:Tu compra|Gastaste|Compraste)\s+(?:por|de)?\s*\$?([\d,]+\.?\d*)',
+            
+            # "Monto: $500.00", "Total: $500.00"
+            r'(?:Monto|Total|Importe|Valor)\s*[:\-]?\s*\$?([\d,]+\.?\d*)',
+        ]
+        
+        # Buscar primero patrones específicos con contexto
+        for pattern in specific_patterns:
+            match = re.search(pattern, text, re.IGNORECASE)
+            if match:
+                try:
+                    amount = float(match.group(1).replace(',', ''))
+                    print(f"✅ NU: Monto encontrado con patrón específico: ${amount}")
+                    return amount
+                except ValueError:
+                    continue
+        
+        # PATRONES GENERALES CON VALIDACIÓN (fallback)
+        general_patterns = [
+            r'\$\s*([\d,]+\.?\d*)',  # $1,234.56
+            r'([\d,]+\.?\d*)\s*(?:MXN|pesos|peso)',  # 1234.56 MXN
+        ]
+        
+        for pattern in general_patterns:
+            matches = re.findall(pattern, text, re.IGNORECASE)
+            if matches:
+                # Tomar el último monto encontrado
+                for amount_str in reversed(matches):
+                    try:
+                        amount = float(amount_str.replace(',', ''))
+                        # Validar que sea un monto razonable
+                        if 0.01 <= amount <= 100000:
+                            print(f"✅ NU: Monto encontrado con patrón general: ${amount}")
+                            return amount
+                    except ValueError:
+                        continue
+        
+        print("⚠️ NU: No se encontró monto válido")
+        return None
     
     def _extract_description(self, body: str, subject: str) -> str:
         """Extrae descripción de la transacción"""

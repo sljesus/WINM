@@ -97,10 +97,58 @@ class MercadoPagoParser(BaseParser):
         return has_transaction and not has_exclusion
     
     def _extract_amount_from_text(self, text: str) -> Optional[float]:
-        """Extrae monto de formato Mercado Pago"""
-        # Mercado Pago usa formatos como: $1,234.56, MXN$1,234.56
-        amount = self.extract_amount(text)
-        return amount
+        """Extrae monto de formato Mercado Pago con contexto específico"""
+        
+        # PATRONES ESPECÍFICOS CON CONTEXTO (prioridad alta)
+        # Estos patrones buscan específicamente montos de transacciones reales
+        specific_patterns = [
+            # Mercado Pago: "Pagaste $500.00", "Pagaste 500.00"
+            r'Pagaste\s+\$?([\d,]+\.?\d*)',
+            
+            # "Tu compra por $500.00", "Compra de $500.00"
+            r'(?:Compra|compra)\s+(?:de|por|en)\s+\$?([\d,]+\.?\d*)',
+            
+            # "Transferencia de $500.00", "Enviaste $500.00"
+            r'(?:Transferencia|Enviaste)\s+(?:de|por)?\s*\$?([\d,]+\.?\d*)',
+            
+            # "Monto: $500.00", "Total: $500.00"
+            r'(?:Monto|Total|Importe)\s*[:\-]?\s*\$?([\d,]+\.?\d*)',
+        ]
+        
+        # Buscar primero patrones específicos con contexto
+        for pattern in specific_patterns:
+            match = re.search(pattern, text, re.IGNORECASE)
+            if match:
+                try:
+                    amount = float(match.group(1).replace(',', ''))
+                    print(f"✅ MercadoPago: Monto encontrado con patrón específico: ${amount}")
+                    return amount
+                except ValueError:
+                    continue
+        
+        # PATRONES GENERALES CON VALIDACIÓN (fallback)
+        # Buscar montos con símbolo de peso en contexto financiero
+        general_patterns = [
+            r'\$\s*([\d,]+\.?\d*)',  # $1,234.56
+            r'([\d,]+\.?\d*)\s*(?:MXN|pesos|peso)',  # 1234.56 MXN
+        ]
+        
+        for pattern in general_patterns:
+            matches = re.findall(pattern, text, re.IGNORECASE)
+            if matches:
+                # Tomar el último monto encontrado (usualmente el más relevante)
+                for amount_str in reversed(matches):
+                    try:
+                        amount = float(amount_str.replace(',', ''))
+                        # Validar que sea un monto razonable (entre $0.01 y $100,000)
+                        if 0.01 <= amount <= 100000:
+                            print(f"✅ MercadoPago: Monto encontrado con patrón general: ${amount}")
+                            return amount
+                    except ValueError:
+                        continue
+        
+        print("⚠️ MercadoPago: No se encontró monto válido")
+        return None
     
     def _extract_description(self, body: str, subject: str) -> str:
         """Extrae descripción de la transacción"""
